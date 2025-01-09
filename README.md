@@ -11,22 +11,29 @@ Currently, two official plugins are available:
 # 📂 Estructura de Carpetas
 
 /src
-  ├── assets/         # Imágenes y recursos
-  ├── components/     # Componentes reutilizables (Botones, Modales, etc.)
-  ├── layouts/        # Layout principal (Sidebar, Header)
-  ├── models/         # Modelos de datos (Clientes, Servicios, Pagos, etc.)
-  │   ├── Cliente.model.js
-  │   ├── Servicio.model.js
-  │   ├── Pago.model.js
-  ├── pages/          # Páginas principales
-  │   ├── Dashboard.jsx
-  │   ├── Clientes.jsx
-  │   ├── Servicios.jsx
-  │   ├── Pagos.jsx
-  │   ├── Reportes.jsx
-  ├── router.jsx      # Definición de rutas
-  ├── services/       # Lógica para manejar datos (API, LocalStorage, etc.)
-  ├── utils/          # Funciones de utilidad (formatos de fecha, moneda, etc.)
-  ├── App.jsx         # Punto de entrada principal
-  ├── index.jsx       # Renderizado de React
-  ├── styles/         # Archivos de Tailwind y CSS globales
+  ├── assets/         # Imágenes y recursos estáticos (logos, íconos, etc.)
+  ├── components/     # Componentes reutilizables divididos por áreas funcionales
+  │   ├── Clientes/   # Componentes específicos para gestionar clientes
+  │   ├── Dashboard/  # Componentes del panel principal
+  │   ├── Pagos/      # Componentes relacionados con la gestión de pagos
+  │   ├── Plantillas/ # Componentes para generación de plantillas o documentos
+  │   ├── Reportes/   # Componentes de visualización de reportes
+  │   ├── Servicios/  # Componentes relacionados con la gestión de servicios
+  │   └── WhatsApp/   # Componentes para la integración de WhatsApp
+  ├── layouts/        # Layouts principales como Header, Sidebar, Footer
+  ├── models/         # Modelos de datos para el proyecto
+  │   ├── Cliente.model.js  # Modelo para clientes
+  │   ├── Servicio.model.js # Modelo para servicios
+  │   ├── Pago.model.js     # Modelo para pagos
+  ├── pages/          # Páginas principales del proyecto
+  │   ├── Dashboard.jsx # Página principal del Dashboard
+  │   ├── Clientes.jsx  # Página para gestionar clientes
+  │   ├── Servicios.jsx # Página para gestionar servicios
+  │   ├── Pagos.jsx     # Página para registrar pagos
+  │   ├── Reportes.jsx  # Página para visualización de reportes
+  ├── services/       # Servicios para manejar lógica (API, LocalStorage, etc.)
+  ├── router.jsx      # Configuración de rutas de la aplicación
+  ├── utils/          # Funciones de utilidad como formatos de fecha, moneda, etc.
+  ├── App.jsx         # Punto de entrada principal de la aplicación
+  ├── index.jsx       # Archivo de renderizado principal
+  ├── styles/         # Estilos globales y configuraciones de Tailwind
