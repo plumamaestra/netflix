@@ -1,273 +1,377 @@
-// src/pages/Dashboard.jsx
-import React, { useEffect, useState } from 'react';
-import { DashboardService } from '../services/Dashboard.service';
-// Opcionalmente, podrías importar tus componentes personalizados:
-// import DashboardChart from '../components/Dashboard/DashboardChart';
-// import UpcomingPayments from '../components/Dashboard/UpcomingPayments';
+import React, { useState, useEffect } from 'react';
+import {
+  TrendingUp,
+  Users,
+  Clock,
+  CheckCircle,
+  Calendar,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
+
+// Importa tus servicios:
+import { ClienteService } from '../services/Cliente.service';
+import { PagoService } from '../services/Pago.service';
+import { ServicioService } from '../services/Servicio.service';
+
+// Card Reutilizable
+const Card = ({ children, className = '' }) => (
+  <div className={`bg-white rounded-xl shadow-sm border border-gray-100 ${className}`}>
+    {children}
+  </div>
+);
 
 const Dashboard = () => {
-  const [stats, setStats] = useState({});
-  const [upcoming, setUpcoming] = useState([]);
+  // -------------------------------------------------
+  // 1. Estados para tu dashboard, mes y año separados
+  // -------------------------------------------------
+  const today = new Date();
+  // Por defecto, podemos iniciar en el mes y año actual,
+  // o en 2025, según prefieras:
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
 
+  const [stats, setStats] = useState({
+    ingresosTotales: 0,
+    distribucionServicios: {},
+  });
+  const [upcomingPayments, setUpcomingPayments] = useState([]);
+  const [clientsStatus, setClientsStatus] = useState({ active: 0, inactive: 0 });
+  const [paymentsSummary, setPaymentsSummary] = useState({
+    totalPayments: 0,
+    paidClients: 0,
+    pendingPayments: 0,
+  });
+  const [morosoClients, setMorosoClients] = useState([]);
+
+  // ---------------------------------------
+  // 2. Funciones para cambiar de mes / año
+  // ---------------------------------------
+  const handlePreviousMonth = () => {
+    if (selectedMonth === 0) {
+      // Si estamos en enero y vamos al mes anterior, retrocedemos el año
+      setSelectedMonth(11);
+      setSelectedYear((prevYear) => prevYear - 1);
+    } else {
+      setSelectedMonth((prevMonth) => prevMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (selectedMonth === 11) {
+      // Si estamos en diciembre y pasamos al siguiente, avanzamos el año
+      setSelectedMonth(0);
+      setSelectedYear((prevYear) => prevYear + 1);
+    } else {
+      setSelectedMonth((prevMonth) => prevMonth + 1);
+    }
+  };
+
+  // ---------------------------------------
+  // 3. useEffect para cargar y filtrar los datos
+  // ---------------------------------------
   useEffect(() => {
-    // Cargar estadísticas
-    const data = DashboardService.getDashboardStats();
-    setStats(data);
+    // 1. Obtener todos los clientes, pagos y servicios
+    const allClients = ClienteService.getClients();
+    const allPayments = PagoService.getPayments();
+    const allServices = ServicioService.getServices();
 
-    // Cargar próximos pagos
-    const ups = DashboardService.getUpcomingPayments();
-    setUpcoming(ups);
-  }, []);
+    // 2. Filtrar los pagos que coincidan con selectedMonth y selectedYear
+    const monthlyPayments = allPayments.filter((payment) => {
+      const pagoDate = new Date(payment.fechaPago);
+      return (
+        pagoDate.getFullYear() === selectedYear &&
+        pagoDate.getMonth() === selectedMonth
+      );
+    });
 
-  // Función para formatear dinero (opcional)
-  const formatMoney = (num = 0) => num.toLocaleString('es-DO');
+    // 3. Dividirlos en pagos pagados y pendientes
+    const paidPayments = monthlyPayments.filter((p) => p.estado === 'Pagado');
+    const pendingPayments = monthlyPayments.filter((p) => p.estado === 'Pendiente');
 
-  const {
-    ingresosTotales = 0,
-    cuentasRenovadas = 0,
-    clientesActivos = 0,
-    clientesInactivos = 0,
-    pagosPendientes = 0,
-    pagosRealizados = 0,
-    distribucionServicios = {},
-  } = stats;
+    // 4. Calcular ingresos totales (solo de este mes y año)
+    const ingresosTotales = paidPayments.reduce((acc, p) => acc + (p.monto || 0), 0);
 
-  // Convertir obj { Netflix: 2, HBO: 1 } en array [["Netflix", 2], ["HBO", 1]]
-  const distServicioArr = Object.entries(distribucionServicios);
+    // 5. Distribución de servicios (solo de los pagos pagados)
+    const distribucionServicios = {};
+    paidPayments.forEach((pago) => {
+      const servicio = pago.servicio || 'Desconocido';
+      if (!distribucionServicios[servicio]) {
+        distribucionServicios[servicio] = 0;
+      }
+      distribucionServicios[servicio]++;
+    });
 
+    // 6. Seteamos stats
+    setStats({
+      ingresosTotales,
+      distribucionServicios,
+    });
+
+    // 7. Clientes Activos e Inactivos (por estado)
+    const activeClients = allClients.filter((c) => c.estado === 'Activo');
+    const inactiveClients = allClients.filter((c) => c.estado === 'Inactivo');
+
+    setClientsStatus({
+      active: activeClients.length,
+      inactive: inactiveClients.length,
+    });
+
+    // 8. Resumen de pagos (totales, pagados, pendientes)
+    setPaymentsSummary({
+      totalPayments: monthlyPayments.length,
+      paidClients: paidPayments.length,
+      pendingPayments: pendingPayments.length,
+    });
+
+    // 9. Próximos pagos: Tomamos los pendientes del mes/año, ordenados por fecha
+    const upcoming = pendingPayments
+      .sort((a, b) => new Date(a.fechaPago) - new Date(b.fechaPago))
+      .slice(0, 5);
+    setUpcomingPayments(upcoming);
+
+    // 10. Clientes “morosos” si tienen 2+ pagos pendientes (en todos los pagos, no solo en el mes)
+    const morosos = allClients.filter((cliente) => {
+      // Buscamos todos los pagos pendientes de este cliente
+      const pagosPendientesCliente = allPayments.filter(
+        (pago) => pago.clienteId === cliente.id && pago.estado === 'Pendiente'
+      );
+      // Retorna true si tiene 2 o más pagos pendientes
+      return pagosPendientesCliente.length >= 2;
+    });
+    setMorosoClients(morosos);
+
+  }, [selectedMonth, selectedYear]);
+
+  // ---------------
+  // Helpers
+  // ---------------
+  const formatMoney = (num) => `RD$ ${num.toLocaleString('es-DO')}`;
+  const formatDate = (dateStr) =>
+    new Date(dateStr).toLocaleDateString('es-DO', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+  // Lista de meses en español
+  const months = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
+  ];
+
+  // ---------------
+  // Render del Dashboard
+  // ---------------
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Navbar superior */}
-      <header className="flex items-center justify-between px-6 py-4 bg-white border-b">
-        <div className="flex items-center space-x-4">
-          <div className="text-lg font-semibold">Streaming Admin</div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6 space-y-6">
+      {/* Header */}
+      <header className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-800">
+            Panel de Control
+          </h1>
+          <p className="text-gray-500 mt-1">Gestión de clientes y pagos</p>
         </div>
-        <div className="flex-1 mx-8 hidden md:block">
+        <div className="relative">
           <input
             type="text"
-            placeholder="Busca cualquier cuenta o cliente..."
-            className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            placeholder="Buscar cliente o servicio..."
+            className="w-full md:w-96 pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
           />
-        </div>
-        <div className="flex items-center space-x-4">
-          <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm">
-            Agregar nueva cuenta
-          </button>
+          <Search className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
         </div>
       </header>
 
-      {/* Contenido principal */}
-      <main className="flex-1 p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Maneja tus cuentas de streaming con cuidado y precisión.
-          </p>
+      {/* Month & Year Selector */}
+      <Card className="p-4">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <button
+            onClick={handlePreviousMonth}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5 text-gray-600" />
+          </button>
+
+          <h2 className="text-xl font-semibold text-gray-800">
+            {months[selectedMonth]} {selectedYear}
+          </h2>
+
+          <button
+            onClick={handleNextMonth}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <ChevronRight className="w-5 h-5 text-gray-600" />
+          </button>
         </div>
+      </Card>
 
-        {/* Rango de fechas (hardcodeado como ejemplo) */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="text-sm text-gray-600">
-            <span className="font-semibold">Enero 2025 - Mayo 2025</span>
-          </div>
-        </div>
-
-        {/* Grid principal */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-          {/* Columna izquierda (8) */}
-          <div className="xl:col-span-8 flex flex-col space-y-6">
-            {/* Fila de tarjetas: Update / Ingresos Totales / Cuentas Renovadas */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Tarjeta “Update” */}
-              <div className="bg-green-900 text-white p-4 rounded-md flex flex-col justify-between">
-                <div className="text-xs uppercase mb-2 font-semibold">
-                  Update
-                </div>
-                <div className="text-xs mb-2">Feb 12th 2025</div>
-                <h2 className="text-lg font-bold mb-2">
-                  ¡Aumento de 40% en alquileres de cuentas!
-                </h2>
-                <button className="bg-white text-green-900 text-sm py-1 px-3 rounded-md self-start">
-                  Ver Detalles
-                </button>
-              </div>
-
-              {/* Tarjeta Ingresos Totales */}
-              <div className="bg-white rounded-md p-4 shadow-sm">
-                <div className="text-gray-500 text-sm">Ingresos Totales</div>
-                <div className="text-2xl font-bold mt-1">
-                  RD$ {formatMoney(ingresosTotales)}
-                </div>
-                <div className="text-green-600 text-sm mt-1">
-                  +35% respecto al mes pasado
-                </div>
-              </div>
-
-              {/* Tarjeta Cuentas Renovadas */}
-              <div className="bg-white rounded-md p-4 shadow-sm">
-                <div className="text-gray-500 text-sm">Cuentas Renovadas</div>
-                <div className="text-2xl font-bold mt-1">{cuentasRenovadas}</div>
-                <div className="text-red-600 text-sm mt-1">
-                  -24% respecto al mes pasado
-                </div>
-              </div>
+      {/* Main Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl">
+              <TrendingUp className="text-white w-6 h-6" />
             </div>
-
-            {/* Sección: Próximos pagos + Ingresos Mensuales + Distribución servicios */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Próximos pagos */}
-              <div className="bg-white rounded-md p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold">Próximos Pagos</h3>
-                </div>
-                {upcoming.length > 0 ? (
-                  <ul className="space-y-3">
-                    {upcoming.map((p) => (
-                      <li
-                        key={p.id}
-                        className="flex items-center justify-between text-sm"
-                      >
-                        <div>
-                          <p className="font-medium text-gray-700">
-                            {p.clienteNombre} - {p.servicio}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(p.fechaPago).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="text-xs text-yellow-600">
-                          {p.estado}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-gray-500">No hay pagos pendientes</p>
-                )}
-              </div>
-
-              {/* Ingresos Mensuales + Reporte de Servicios */}
-              <div className="flex flex-col space-y-6">
-                {/* Ingresos Mensuales (ejemplo de gráfico simulado) */}
-                <div className="bg-white rounded-md p-4 shadow-sm flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-md font-bold">Ingresos Mensuales</h3>
-                    <div className="text-sm text-gray-500">
-                      <span className="mr-2">Mes actual</span> |{' '}
-                      <span className="ml-2">Mes anterior</span>
-                    </div>
-                  </div>
-                  <div className="text-gray-700 text-xl font-semibold mb-2">
-                    RD$ {formatMoney(ingresosTotales)}
-                    <span className="text-green-600 text-base ml-2">+35%</span>
-                  </div>
-                  {/* Simulación de un gráfico */}
-                  <div className="h-24 bg-gray-100 rounded-md flex items-center justify-center text-gray-400">
-                    [ Gráfico de barras ]
-                  </div>
-                </div>
-
-                {/* Reporte de servicios (barras horizontales) */}
-                <div className="bg-white rounded-md p-4 shadow-sm flex-1">
-                  <h3 className="text-md font-bold mb-2">Servicios Alquilados</h3>
-                  <p className="text-xs text-gray-500 mb-2">
-                    Distribución por servicio (Pagados)
-                  </p>
-                  {distServicioArr.length === 0 && (
-                    <p className="text-sm text-gray-500">No hay pagos realizados</p>
-                  )}
-                  {distServicioArr.map(([servName, count]) => {
-                    // Para calcular el porcentaje de cada servicio
-                    const total = pagosRealizados || 1;
-                    const pct = (count / total) * 100;
-
-                    return (
-                      <div key={servName} className="mb-3">
-                        <div className="flex justify-between text-sm">
-                          <span>
-                            {servName} ({count})
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 h-2 rounded mt-1">
-                          <div
-                            className="bg-green-500 h-2 rounded"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+            <div className="ml-4">
+              <p className="text-sm text-gray-500 font-medium">Ingresos Totales</p>
+              <h2 className="text-2xl font-bold text-gray-800">
+                {formatMoney(stats.ingresosTotales || 0)}
+              </h2>
             </div>
           </div>
+        </Card>
 
-          {/* Columna derecha (4) */}
-          <div className="xl:col-span-4 flex flex-col space-y-6">
-            {/* Rendimiento General (Donut) */}
-            <div className="bg-white p-4 rounded-md shadow-sm">
-              <h3 className="text-md font-bold mb-2">Rendimiento General</h3>
-              <div className="flex items-center justify-center py-4">
-                <div className="relative w-32 h-32">
-                  <svg viewBox="0 0 36 36" className="w-full h-full">
-                    <path
-                      className="text-green-200"
-                      strokeWidth="4"
-                      stroke="currentColor"
-                      fill="none"
-                      d="M18 2.0845
-                         a 15.9155 15.9155 0 0 1 0 31.831
-                         a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
-                    <path
-                      className="text-green-600"
-                      strokeDasharray="23, 100"
-                      strokeDashoffset="25"
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      stroke="currentColor"
-                      fill="none"
-                      d="M18 2.0845
-                         a 15.9155 15.9155 0 0 1 0 31.831
-                         a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center text-lg font-semibold">
-                    {clientesActivos}
-                  </div>
-                </div>
+        <Card className="p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center">
+            <div className="bg-gradient-to-br from-green-500 to-green-600 p-3 rounded-xl">
+              <Users className="text-white w-6 h-6" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm text-gray-500 font-medium">Clientes Activos</p>
+              <h2 className="text-2xl font-bold text-gray-800">
+                {clientsStatus.active}
+              </h2>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center">
+            <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 p-3 rounded-xl">
+              <Clock className="text-white w-6 h-6" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm text-gray-500 font-medium">Pagos Pendientes</p>
+              <h2 className="text-2xl font-bold text-gray-800">
+                {paymentsSummary.pendingPayments}
+              </h2>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Payment Summary & Morosos */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="p-6">
+          <h2 className="text-xl font-bold text-gray-800 mb-6">Resumen de Pagos</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-green-50 p-4 rounded-xl">
+              <div className="flex items-center">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <p className="ml-2 text-sm font-medium text-gray-600">
+                  Pagos Realizados
+                </p>
               </div>
-              <p className="text-sm text-gray-500 text-center">
-                Total de clientes activos: {clientesActivos}
+              <h3 className="text-2xl font-bold text-gray-800 mt-2">
+                {paymentsSummary.paidClients}
+              </h3>
+            </div>
+            <div className="bg-red-50 p-4 rounded-xl">
+              <div className="flex items-center">
+                <Clock className="w-5 h-5 text-red-600" />
+                <p className="ml-2 text-sm font-medium text-gray-600">
+                  Pagos Pendientes
+                </p>
+              </div>
+              <h3 className="text-2xl font-bold text-red-600 mt-2">
+                {paymentsSummary.pendingPayments}
+              </h3>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <h2 className="text-xl font-bold text-gray-800 mb-6">Clientes Morosos</h2>
+          <div className="space-y-4">
+            {morosoClients.length > 0 ? (
+              morosoClients.map((client) => (
+                <div
+                  key={client.id}
+                  className="flex justify-between items-center p-3 bg-red-50 rounded-lg"
+                >
+                  <span className="font-medium text-gray-800">{client.name}</span>
+                  <span className="px-3 py-1 bg-red-100 text-red-600 rounded-full text-sm font-medium">
+                    Moroso
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-center text-gray-500 py-4">
+                No hay clientes morosos
               </p>
-              <div className="flex justify-center mt-3">
-                <button className="text-xs text-green-600 border border-green-600 rounded px-2 py-1">
-                  Ver más
-                </button>
-              </div>
-              <div className="flex justify-around items-center mt-4 text-xs">
-                <span className="text-gray-600">Activos</span>
-                <span className="text-gray-600">
-                  Inactivos: {clientesInactivos}
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Próximos Pagos */}
+      <Card className="p-6">
+        <h2 className="text-xl font-bold text-gray-800 mb-6">Próximos Pagos</h2>
+        <div className="grid gap-4">
+          {upcomingPayments.length > 0 ? (
+            upcomingPayments.map((payment) => (
+              <div
+                key={payment.id}
+                className="flex justify-between items-center p-4 bg-blue-50 rounded-lg"
+              >
+                <div className="flex items-center">
+                  <Calendar className="w-5 h-5 text-blue-600 mr-3" />
+                  <span className="font-medium text-gray-800">
+                    {payment.clienteNombre}
+                  </span>
+                </div>
+                <span className="text-sm text-blue-600 font-medium">
+                  {formatDate(payment.fechaPago)}
                 </span>
               </div>
-            </div>
-
-            {/* CTA / Banner */}
-            <div className="bg-white p-4 rounded-md shadow-sm">
-              <h3 className="text-md font-bold mb-2">
-                Mejora tu gestión de cuentas ahora.
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                La forma más fácil de manejar tus servicios de streaming con cuidado y precisión.
-              </p>
-              <button className="bg-green-100 text-green-700 px-3 py-2 rounded-md text-sm font-medium">
-                Actualiza tu Plan
-              </button>
-            </div>
-          </div>
+            ))
+          ) : (
+            <p className="text-center text-gray-500 py-4">
+              No hay pagos próximos
+            </p>
+          )}
         </div>
-      </main>
+      </Card>
+
+      {/* Distribución de Servicios */}
+      <Card className="p-6">
+        <h2 className="text-xl font-bold text-gray-800 mb-6">Distribución de Servicios</h2>
+        <div className="space-y-6">
+          {Object.entries(stats.distribucionServicios || {}).map(([servicio, count]) => (
+            <div key={servicio}>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="font-medium text-gray-700">{servicio}</span>
+                <span className="text-blue-600 font-medium">
+                  {count} {count === 1 ? 'pago' : 'pagos'}
+                </span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2.5">
+                <div
+                  className="h-2.5 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
+                  style={{
+                    width:
+                      paymentsSummary.paidClients > 0
+                        ? `${(count / paymentsSummary.paidClients) * 100}%`
+                        : '0%',
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
     </div>
   );
 };
