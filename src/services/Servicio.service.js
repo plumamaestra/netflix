@@ -1,32 +1,57 @@
-const SERVICIOS_KEY = 'servicios';
+// services/Servicio.service.js
+import { collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { firestore } from '../firebase/firebaseConfig';
+
+const SERVICIOS_COLLECTION = 'servicios';
 
 export const ServicioService = {
-  // Obtener todos los servicios
-  getServices: () => JSON.parse(localStorage.getItem(SERVICIOS_KEY)) || [],
-
-  // Obtener servicio por ID
-  getServiceById: (id) => ServicioService.getServices().find((service) => service.id === id),
-
-  // Agregar servicio
-  addService: (service) => {
-    const services = ServicioService.getServices();
-    service.id = Date.now().toString();
-    service.fechaCreacion = new Date().toLocaleDateString();
-    services.push(service);
-    localStorage.setItem(SERVICIOS_KEY, JSON.stringify(services));
+  /**
+   * Obtener todos los servicios
+   */
+  getServices: async () => {
+    const serviciosCol = collection(firestore, SERVICIOS_COLLECTION);
+    const serviciosSnapshot = await getDocs(serviciosCol);
+    const serviciosList = serviciosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return serviciosList;
   },
 
-  // Actualizar servicio
-  updateService: (id, updatedService) => {
-    const services = ServicioService.getServices().map((service) =>
-      service.id === id ? { ...service, ...updatedService } : service
-    );
-    localStorage.setItem(SERVICIOS_KEY, JSON.stringify(services));
+  /**
+   * Obtener servicio por ID
+   */
+  getServiceById: async (id) => {
+    const servicioDoc = doc(firestore, SERVICIOS_COLLECTION, id);
+    const servicioSnapshot = await getDoc(servicioDoc);
+    if (servicioSnapshot.exists()) {
+      return { id: servicioSnapshot.id, ...servicioSnapshot.data() };
+    } else {
+      throw new Error('Servicio no encontrado');
+    }
   },
 
-  // Eliminar servicio
-  deleteService: (id) => {
-    const services = ServicioService.getServices().filter((service) => service.id !== id);
-    localStorage.setItem(SERVICIOS_KEY, JSON.stringify(services));
+  /**
+   * Agregar servicio
+   */
+  addService: async (serviceData) => {
+    const serviciosCol = collection(firestore, SERVICIOS_COLLECTION);
+    const servicio = { ...serviceData, fechaCreacion: new Date().toISOString() };
+    const docRef = await addDoc(serviciosCol, servicio);
+    return { id: docRef.id, ...servicio };
+  },
+
+  /**
+   * Actualizar servicio
+   */
+  updateService: async (id, updatedService) => {
+    const servicioDoc = doc(firestore, SERVICIOS_COLLECTION, id);
+    await updateDoc(servicioDoc, updatedService);
+    return { id, ...updatedService };
+  },
+
+  /**
+   * Eliminar servicio
+   */
+  deleteService: async (id) => {
+    const servicioDoc = doc(firestore, SERVICIOS_COLLECTION, id);
+    await deleteDoc(servicioDoc);
   },
 };

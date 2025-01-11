@@ -1,3 +1,4 @@
+// src/components/Plantillas/PlantillasTable.jsx
 import React from 'react';
 
 const PlantillasTable = ({ plantillas, onEdit, onDelete }) => {

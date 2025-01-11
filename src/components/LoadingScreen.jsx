@@ -1,6 +1,6 @@
 // src/components/LoadingScreen.jsx
 import React from 'react';
-import { Loader2 } from 'lucide-react'; // o algún icono que desees
+import { Loader2 } from 'lucide-react'; // Asegúrate de tener lucide-react instalado
 
 const LoadingScreen = () => {
   return (

@@ -1,33 +1,45 @@
+// src/components/Servicios/AddServiceModal.jsx
 import React, { useState, useEffect } from 'react';
 
 const AddServiceModal = ({ isOpen, onClose, onSave, initialData }) => {
   const [formData, setFormData] = useState({
-    name: '',
-    price: '',
-    description: '',
-    estado: 'Activo',
+    nombre: '',
+    precioMensual: '',
+    descripcion: '',
+    estado: 'disponible',
     proximaFechaPago: '',
   });
 
   const [errors, setErrors] = useState({
-    name: '',
-    price: '',
+    nombre: '',
+    precioMensual: '',
     proximaFechaPago: '',
   });
 
+  const [loading, setLoading] = useState(false);
+  const [errorFetch, setErrorFetch] = useState('');
+
   useEffect(() => {
+    if (!isOpen) return;
+
     if (initialData) {
       setFormData(initialData);
     } else {
       setFormData({
-        name: '',
-        price: '',
-        description: '',
-        estado: 'Activo',
+        nombre: '',
+        precioMensual: '',
+        descripcion: '',
+        estado: 'disponible',
         proximaFechaPago: '',
       });
     }
-  }, [initialData]);
+    setErrors({
+      nombre: '',
+      precioMensual: '',
+      proximaFechaPago: '',
+    });
+    setErrorFetch('');
+  }, [initialData, isOpen]);
 
   /**
    * Manejar cambios en los campos del formulario
@@ -35,10 +47,10 @@ const AddServiceModal = ({ isOpen, onClose, onSave, initialData }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    if (name === 'name') {
+    if (name === 'nombre') {
       // Convertir el nombre a mayúsculas
       setFormData({ ...formData, [name]: value.toUpperCase() });
-    } else if (name === 'price') {
+    } else if (name === 'precioMensual') {
       // Validar que el precio sea numérico
       if (!/^\d*\.?\d*$/.test(value)) return; // Solo permitir números y punto decimal
       setFormData({ ...formData, [name]: value });
@@ -56,16 +68,16 @@ const AddServiceModal = ({ isOpen, onClose, onSave, initialData }) => {
     let valid = true;
     const newErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'El nombre del servicio es obligatorio.';
+    if (!formData.nombre.trim()) {
+      newErrors.nombre = 'El nombre del servicio es obligatorio.';
       valid = false;
     }
 
-    if (!formData.price.trim()) {
-      newErrors.price = 'El precio mensual es obligatorio.';
+    if (!formData.precioMensual.trim()) {
+      newErrors.precioMensual = 'El precio mensual es obligatorio.';
       valid = false;
-    } else if (isNaN(Number(formData.price))) {
-      newErrors.price = 'El precio mensual debe ser un número válido.';
+    } else if (isNaN(Number(formData.precioMensual))) {
+      newErrors.precioMensual = 'El precio mensual debe ser un número válido.';
       valid = false;
     }
 
@@ -81,16 +93,24 @@ const AddServiceModal = ({ isOpen, onClose, onSave, initialData }) => {
   /**
    * Manejar el envío del formulario
    */
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validateForm()) {
-      onSave(formData);
+      setLoading(true);
+      try {
+        await onSave(formData);
+      } catch (err) {
+        console.error('Error al guardar servicio:', err);
+        setErrorFetch('Error al guardar el servicio.');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-lg w-96">
         <h2 className="text-xl font-semibold mb-4">
           {initialData ? 'Editar Servicio' : 'Agregar Servicio'}
@@ -98,29 +118,37 @@ const AddServiceModal = ({ isOpen, onClose, onSave, initialData }) => {
 
         {/* Nombre (Mayúsculas Automáticas) */}
         <input
-          name="name"
+          name="nombre"
           placeholder="Nombre"
-          value={formData.name}
+          value={formData.nombre}
           onChange={handleChange}
-          className={`w-full mb-2 p-2 border rounded ${errors.name ? 'border-red-500' : ''}`}
+          className={`w-full mb-2 p-2 border rounded ${
+            errors.nombre ? 'border-red-500' : ''
+          }`}
         />
-        {errors.name && <p className="text-red-500 text-xs mb-2">{errors.name}</p>}
+        {errors.nombre && (
+          <p className="text-red-500 text-xs mb-2">{errors.nombre}</p>
+        )}
 
         {/* Precio Mensual */}
         <input
-          name="price"
+          name="precioMensual"
           placeholder="Precio Mensual"
-          value={formData.price}
+          value={formData.precioMensual}
           onChange={handleChange}
-          className={`w-full mb-2 p-2 border rounded ${errors.price ? 'border-red-500' : ''}`}
+          className={`w-full mb-2 p-2 border rounded ${
+            errors.precioMensual ? 'border-red-500' : ''
+          }`}
         />
-        {errors.price && <p className="text-red-500 text-xs mb-2">{errors.price}</p>}
+        {errors.precioMensual && (
+          <p className="text-red-500 text-xs mb-2">{errors.precioMensual}</p>
+        )}
 
         {/* Descripción (Opcional) */}
         <input
-          name="description"
+          name="descripcion"
           placeholder="Descripción (Opcional)"
-          value={formData.description}
+          value={formData.descripcion}
           onChange={handleChange}
           className="w-full mb-2 p-2 border rounded"
         />
@@ -131,10 +159,19 @@ const AddServiceModal = ({ isOpen, onClose, onSave, initialData }) => {
           type="date"
           value={formData.proximaFechaPago}
           onChange={handleChange}
-          className={`w-full mb-2 p-2 border rounded ${errors.proximaFechaPago ? 'border-red-500' : ''}`}
+          className={`w-full mb-2 p-2 border rounded ${
+            errors.proximaFechaPago ? 'border-red-500' : ''
+          }`}
         />
         {errors.proximaFechaPago && (
           <p className="text-red-500 text-xs mb-2">{errors.proximaFechaPago}</p>
+        )}
+
+        {/* Mensaje de Error */}
+        {errorFetch && (
+          <div className="text-red-500 text-sm mb-4">
+            ⚠️ {errorFetch}
+          </div>
         )}
 
         {/* Botones */}
@@ -142,14 +179,16 @@ const AddServiceModal = ({ isOpen, onClose, onSave, initialData }) => {
           <button
             onClick={onClose}
             className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded"
+            disabled={loading}
           >
             Cancelar
           </button>
           <button
             onClick={handleSubmit}
             className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+            disabled={loading}
           >
-            Guardar
+            {loading ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
       </div>

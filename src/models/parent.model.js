@@ -1,3 +1,4 @@
+// models/parent.model.js
 import { v4 as uuidv4 } from "uuid";
 
 export default class Parent {
@@ -5,6 +6,6 @@ export default class Parent {
     const uuid = uuidv4();
     this.id = uuid;
     this.key = uuid;
-    this.fechaCreacion = new Date().toLocaleDateString();
+    this.fechaCreacion = new Date().toISOString(); // Usar formato ISO para consistencia
   }
 }

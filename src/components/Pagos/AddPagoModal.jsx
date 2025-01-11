@@ -1,3 +1,4 @@
+// src/components/Pagos/AddPagoModal.jsx
 import React, { useState, useEffect } from 'react';
 import { ClienteService } from '../../services/Cliente.service';
 import { ServicioService } from '../../services/Servicio.service';
@@ -15,103 +16,182 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
     numeroMeses: 1,
   });
 
-  // Lista de todos los servicios disponibles
   const [allServices, setAllServices] = useState([]);
-  // Lista de servicios *filtrados* (los que tiene el cliente)
   const [filteredServices, setFilteredServices] = useState([]);
-  // Lista de clientes
   const [clientes, setClientes] = useState([]);
 
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [loadingServicios, setLoadingServicios] = useState(false);
+  const [errorClientes, setErrorClientes] = useState('');
+  const [errorServicios, setErrorServicios] = useState('');
+  const [formError, setFormError] = useState('');
+
   useEffect(() => {
-    setClientes(ClienteService.getClients());
-    setAllServices(ServicioService.getServices());
-    
-    if (initialData) {
-      setFormData(initialData);
-    }
-  }, [initialData]);
+    if (!isOpen) return;
+
+    const fetchData = async () => {
+      setLoadingClientes(true);
+      setLoadingServicios(true);
+      try {
+        const [clientesData, serviciosData] = await Promise.all([
+          ClienteService.getClients(),
+          ServicioService.getServices(),
+        ]);
+        setClientes(clientesData);
+        setAllServices(serviciosData);
+
+        if (initialData) {
+          // Verificar si servicioId es una referencia y extraer el ID
+          const servicioId =
+            initialData.servicioId && initialData.servicioId.id
+              ? initialData.servicioId.id
+              : initialData.servicioId;
+
+          setFormData({
+            clienteId: initialData.clienteId,
+            clienteNombre: initialData.clienteNombre,
+            phone: initialData.phone,
+            servicioId: servicioId || '',
+            servicio: initialData.servicio || '',
+            monto: initialData.monto || '',
+            fechaPago: initialData.fechaPago || new Date().toISOString().split('T')[0],
+            estado: initialData.estado || 'Pendiente',
+            numeroMeses: initialData.numeroMeses || 1,
+          });
+
+          // Filtrar servicios según el cliente si se está editando
+          const selectedCliente = clientesData.find(c => c.id === initialData.clienteId);
+          if (selectedCliente) {
+            // Extraer IDs de los servicios referenciados
+            const servicioIds = Array.isArray(selectedCliente.servicios)
+              ? selectedCliente.servicios.map(ref => ref.id)
+              : selectedCliente.servicios && selectedCliente.servicios.id
+              ? [selectedCliente.servicios.id]
+              : [];
+
+            const clientServices = serviciosData.filter(s => servicioIds.includes(s.id));
+            setFilteredServices(clientServices);
+          }
+        } else {
+          setFormData({
+            clienteId: '',
+            clienteNombre: '',
+            phone: '',
+            servicioId: '',
+            servicio: '',
+            monto: '',
+            fechaPago: new Date().toISOString().split('T')[0],
+            estado: 'Pendiente',
+            numeroMeses: 1,
+          });
+          setFilteredServices([]);
+        }
+
+        // Resetear errores al abrir el modal
+        setFormError('');
+      } catch (err) {
+        console.error('Error al cargar clientes o servicios:', err);
+        if (!clientes.length) setErrorClientes('No se pudieron cargar los clientes.');
+        if (!allServices.length) setErrorServicios('No se pudieron cargar los servicios.');
+      } finally {
+        setLoadingClientes(false);
+        setLoadingServicios(false);
+      }
+    };
+
+    fetchData();
+  }, [initialData, isOpen]); // Eliminado 'clientes' y 'allServices' de las dependencias
 
   /**
    * Maneja el cambio de cliente en el select
    */
-  const handleClienteChange = (e) => {
+  const handleClienteChange = async (e) => {
     const clienteId = e.target.value;
-    const selectedCliente = clientes.find((c) => c.id === clienteId);
-
-    if (!selectedCliente) {
+    if (!clienteId) {
       // Si no hay cliente seleccionado, limpiamos la info
-      setFormData((prev) => ({
-        ...prev,
+      setFormData({
         clienteId: '',
         clienteNombre: '',
         phone: '',
         servicioId: '',
         servicio: '',
         monto: '',
-      }));
+        fechaPago: new Date().toISOString().split('T')[0],
+        estado: 'Pendiente',
+        numeroMeses: 1,
+      });
       setFilteredServices([]);
       return;
     }
 
-    // Actualizamos datos del cliente
-    setFormData((prev) => ({
-      ...prev,
-      clienteId: selectedCliente.id,
-      clienteNombre: selectedCliente.name,
-      phone: selectedCliente.phone,
-      // Limpiamos el servicio cuando se cambia de cliente
-      servicioId: '',
-      servicio: '',
-      monto: '',
-    }));
-
-    // Filtramos los servicios que el cliente tiene contratado
-    let clientServices = [];
-    if (Array.isArray(selectedCliente.servicios)) {
-      clientServices = allServices.filter((s) => selectedCliente.servicios.includes(s.id));
-    } else if (selectedCliente.servicios) {
-      // Caso: el cliente tiene un solo ID en "servicios"
-      const singleService = allServices.find((s) => s.id === selectedCliente.servicios);
-      clientServices = singleService ? [singleService] : [];
-    }
-    setFilteredServices(clientServices);
-
-    // AUTO-SELECCIONAMOS si tiene solo un servicio
-    if (clientServices.length === 1) {
-      const unicoServicio = clientServices[0];
-      // Calculamos monto inicial
-      const total = unicoServicio.price * formData.numeroMeses;
-      setFormData((prev) => ({
+    try {
+      const selectedCliente = await ClienteService.getClientById(clienteId);
+      setFormData(prev => ({
         ...prev,
-        servicioId: unicoServicio.id,
-        servicio: unicoServicio.name,
-        monto: total,
+        clienteId: selectedCliente.id,
+        clienteNombre: selectedCliente.name,
+        phone: selectedCliente.phone,
+        servicioId: '',
+        servicio: '',
+        monto: '',
       }));
+
+      // Filtramos los servicios que el cliente tiene contratado
+      const servicioIds = Array.isArray(selectedCliente.servicios)
+        ? selectedCliente.servicios.map(ref => ref.id)
+        : selectedCliente.servicios && selectedCliente.servicios.id
+        ? [selectedCliente.servicios.id]
+        : [];
+
+      const clientServices = allServices.filter(s => servicioIds.includes(s.id));
+      setFilteredServices(clientServices);
+
+      // AUTO-SELECCIONAMOS si tiene solo un servicio
+      if (clientServices.length === 1) {
+        const unicoServicio = clientServices[0];
+        const total = unicoServicio.precioMensual * formData.numeroMeses;
+        setFormData(prev => ({
+          ...prev,
+          servicioId: unicoServicio.id,
+          servicio: unicoServicio.nombre,
+          monto: total,
+        }));
+      }
+    } catch (err) {
+      console.error('Error al obtener el cliente:', err);
+      setFormError('Error al obtener los datos del cliente seleccionado.');
     }
   };
 
   /**
    * Maneja el cambio de servicio
    */
-  const handleServicioChange = (e) => {
+  const handleServicioChange = async (e) => {
     const servicioId = e.target.value;
-    const selectedServicio = filteredServices.find((s) => s.id === servicioId);
-
-    if (selectedServicio) {
-      const total = selectedServicio.price * formData.numeroMeses;
-      setFormData((prev) => ({
-        ...prev,
-        servicioId: selectedServicio.id,
-        servicio: selectedServicio.name,
-        monto: total,
-      }));
-    } else {
-      setFormData((prev) => ({
+    if (!servicioId) {
+      setFormData(prev => ({
         ...prev,
         servicioId: '',
         servicio: '',
         monto: '',
       }));
+      return;
+    }
+
+    try {
+      const selectedServicio = await ServicioService.getServiceById(servicioId);
+      if (selectedServicio) {
+        const total = selectedServicio.precioMensual * formData.numeroMeses;
+        setFormData(prev => ({
+          ...prev,
+          servicioId: selectedServicio.id,
+          servicio: selectedServicio.nombre,
+          monto: total,
+        }));
+      }
+    } catch (err) {
+      console.error('Error al obtener el servicio:', err);
+      setFormError('Error al obtener los datos del servicio seleccionado.');
     }
   };
 
@@ -120,17 +200,17 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
    */
   const handleNumeroMesesChange = (e) => {
     const numeroMeses = parseInt(e.target.value, 10) || 1;
-    const selectedServicio = filteredServices.find((s) => s.id === formData.servicioId);
+    const selectedServicio = allServices.find(s => s.id === formData.servicioId);
 
     if (selectedServicio) {
-      const total = selectedServicio.price * numeroMeses;
-      setFormData((prev) => ({
+      const total = selectedServicio.precioMensual * numeroMeses;
+      setFormData(prev => ({
         ...prev,
         numeroMeses,
         monto: total,
       }));
     } else {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
         numeroMeses,
       }));
@@ -138,57 +218,99 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
   };
 
   /**
+   * Maneja el cambio en la fecha de pago
+   */
+  const handleFechaPagoChange = (e) => {
+    const fechaPago = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      fechaPago,
+    }));
+  };
+
+  /**
+   * Maneja el cambio en el estado
+   */
+  const handleEstadoChange = (e) => {
+    const estado = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      estado,
+    }));
+  };
+
+  /**
    * Maneja el envío del formulario
    */
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.clienteId || !formData.servicioId || !formData.monto) {
-      alert('Por favor, complete todos los campos.');
+      setFormError('Por favor, complete todos los campos obligatorios.');
       return;
     }
-    onSave(formData);
-    onClose();
+
+    try {
+      await onSave(formData);
+      onClose();
+      setFormError('');
+    } catch (err) {
+      console.error('Error al guardar pago:', err);
+      setFormError('Error al guardar el pago.');
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-full overflow-y-auto">
         <h2 className="text-xl font-semibold mb-4">
           {initialData ? 'Editar Pago' : 'Registrar Pago'}
         </h2>
 
         {/* Cliente */}
         <label className="block mb-1 font-medium text-gray-700">Cliente</label>
-        <select
-          name="clienteId"
-          value={formData.clienteId}
-          onChange={handleClienteChange}
-          className="w-full mb-4 p-2 border rounded"
-        >
-          <option value="">Seleccionar Cliente</option>
-          {clientes.map((cliente) => (
-            <option key={cliente.id} value={cliente.id}>
-              {cliente.name}
-            </option>
-          ))}
-        </select>
+        {loadingClientes ? (
+          <p>Cargando clientes...</p>
+        ) : errorClientes ? (
+          <p className="text-red-500">{errorClientes}</p>
+        ) : (
+          <select
+            name="clienteId"
+            value={formData.clienteId}
+            onChange={handleClienteChange}
+            className="w-full mb-4 p-2 border rounded"
+          >
+            <option value="">Seleccionar Cliente</option>
+            {clientes.map(cliente => (
+              <option key={cliente.id} value={cliente.id}>
+                {cliente.name}
+              </option>
+            ))}
+          </select>
+        )}
 
         {/* Servicio (solo los que el cliente tiene) */}
         <label className="block mb-1 font-medium text-gray-700">Servicio</label>
-        <select
-          name="servicioId"
-          value={formData.servicioId}
-          onChange={handleServicioChange}
-          className="w-full mb-4 p-2 border rounded"
-        >
-          <option value="">Seleccionar Servicio</option>
-          {filteredServices.map((serv) => (
-            <option key={serv.id} value={serv.id}>
-              {serv.name} (${serv.price}/mes)
-            </option>
-          ))}
-        </select>
+        {loadingServicios ? (
+          <p>Cargando servicios...</p>
+        ) : errorServicios ? (
+          <p className="text-red-500">{errorServicios}</p>
+        ) : (
+          <select
+            name="servicioId"
+            value={formData.servicioId}
+            onChange={handleServicioChange}
+            className="w-full mb-4 p-2 border rounded"
+            disabled={filteredServices.length === 0}
+          >
+            <option value="">Seleccionar Servicio</option>
+            {filteredServices.map(serv => (
+              <option key={serv.id} value={serv.id}>
+                {serv.nombre} (${serv.precioMensual}/mes)
+              </option>
+            ))}
+          </select>
+        )}
 
         {/* Número de meses */}
         <label className="block mb-1 font-medium text-gray-700">Número de meses</label>
@@ -208,7 +330,7 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
           type="number"
           value={formData.monto}
           readOnly
-          className="w-full mb-4 p-2 border rounded"
+          className="w-full mb-4 p-2 border rounded bg-gray-100 cursor-not-allowed"
         />
 
         {/* Fecha de pago */}
@@ -217,7 +339,7 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
           name="fechaPago"
           type="date"
           value={formData.fechaPago}
-          onChange={(e) => setFormData({ ...formData, fechaPago: e.target.value })}
+          onChange={handleFechaPagoChange}
           className="w-full mb-4 p-2 border rounded"
         />
 
@@ -226,19 +348,34 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
         <select
           name="estado"
           value={formData.estado}
-          onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+          onChange={handleEstadoChange}
           className="w-full mb-4 p-2 border rounded"
         >
           <option value="Pendiente">Pendiente</option>
           <option value="Pagado">Pagado</option>
         </select>
 
+        {/* Mensaje de Error */}
+        {formError && (
+          <div className="text-red-500 text-sm mb-4">
+            ⚠️ {formError}
+          </div>
+        )}
+
         {/* Botones */}
         <div className="flex justify-end space-x-2">
-          <button onClick={onClose} className="bg-gray-300 px-4 py-2 rounded">
+          <button
+            onClick={onClose}
+            className="bg-gray-300 px-4 py-2 rounded"
+            disabled={loadingClientes || loadingServicios}
+          >
             Cancelar
           </button>
-          <button onClick={handleSubmit} className="bg-green-500 text-white px-4 py-2 rounded">
+          <button
+            onClick={handleSubmit}
+            className="bg-green-500 text-white px-4 py-2 rounded"
+            disabled={loadingClientes || loadingServicios}
+          >
             Guardar
           </button>
         </div>

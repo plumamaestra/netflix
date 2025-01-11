@@ -1,3 +1,4 @@
+// src/pages/Pagos.jsx
 import React, { useState, useEffect } from 'react';
 import { PagoService } from '../services/Pago.service';
 import { PlantillaService } from '../services/Plantilla.service';
@@ -9,45 +10,81 @@ const Pagos = () => {
   const [plantillas, setPlantillas] = useState([]); // Estado para almacenar las plantillas
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   /**
    * Cargar pagos y plantillas al inicio
    */
   useEffect(() => {
-    // Generar pagos pendientes y actualizar estado de clientes al cargar la página
-    PagoService.generatePendingPayments();
-    setPayments(PagoService.getPayments());
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await PagoService.generatePendingPayments();
+        const fetchedPayments = await PagoService.getPayments();
+        setPayments(fetchedPayments);
 
-    // Cargar las plantillas
-    setPlantillas(PlantillaService.getPlantillas());
+        const fetchedPlantillas = await PlantillaService.getPlantillas();
+        setPlantillas(fetchedPlantillas);
+      } catch (err) {
+        console.error('Error al cargar pagos o plantillas:', err);
+        setError('No se pudieron cargar los pagos o plantillas.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
   /**
    * Guardar un nuevo pago o actualizar uno existente
    */
-  const handleSave = (payment) => {
-    if (editingPayment) {
-      // Actualizar pago existente
-      PagoService.updatePayment(payment.id, payment);
-    } else {
-      // Agregar nuevo pago
-      PagoService.addPayment(payment);
+  const handleSave = async (payment) => {
+    try {
+      if (editingPayment) {
+        // Actualizar pago existente
+        await PagoService.updatePayment(editingPayment.id, payment);
+        const updatedPayments = await PagoService.getPayments();
+        setPayments(updatedPayments);
+      } else {
+        // Agregar nuevo pago
+        await PagoService.addPayment(payment);
+        const updatedPayments = await PagoService.getPayments();
+        setPayments(updatedPayments);
+      }
+      setModalOpen(false);
+      setEditingPayment(null);
+    } catch (err) {
+      console.error('Error al guardar pago:', err);
+      setError('No se pudo guardar el pago.');
     }
-
-    setPayments(PagoService.getPayments());
-    setModalOpen(false);
-    setEditingPayment(null);
   };
 
   /**
    * Eliminar un pago
    */
-  const handleDelete = (id) => {
-    if (confirm('¿Estás seguro de eliminar este pago?')) {
-      PagoService.deletePayment(id);
-      setPayments(PagoService.getPayments());
+  const handleDelete = async (id) => {
+    const confirmDelete = window.confirm('¿Estás seguro de eliminar este pago?');
+    if (!confirmDelete) return;
+
+    try {
+      await PagoService.deletePayment(id);
+      const updatedPayments = await PagoService.getPayments();
+      setPayments(updatedPayments);
+    } catch (err) {
+      console.error('Error al eliminar pago:', err);
+      setError('No se pudo eliminar el pago.');
     }
   };
+
+  if (loading) {
+    return (
+      <div className="p-6 bg-gray-50 min-h-screen flex items-center justify-center">
+        <p className="text-xl text-gray-700">Cargando pagos...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -64,6 +101,13 @@ const Pagos = () => {
           + Registrar Pago
         </button>
       </div>
+
+      {/* Mensaje de Error */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">
+          {error}
+        </div>
+      )}
 
       {/* Tabla de Pagos */}
       <PagosTable
