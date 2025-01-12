@@ -100,21 +100,29 @@ const AddClientModal = ({ isOpen, onClose, onSave, initialData }) => {
   };
 
   /**
-   * Guardar Cliente
-   */
-  const handleSubmit = async () => {
-    try {
-      if (!formData.proximaFechaPago) {
-        throw new Error('Debe seleccionar un servicio con una próxima fecha de pago válida.');
-      }
-
-      await onSave(formData);
-      setError('');
-    } catch (error) {
-      console.error('Error al guardar cliente:', error.message);
-      setError(error.message || 'Error al guardar el cliente.');
+ * Guardar Cliente
+ */
+const handleSubmit = async () => {
+  try {
+    if (!formData.proximaFechaPago) {
+      throw new Error('Debe seleccionar un servicio con una próxima fecha de pago válida.');
     }
-  };
+
+    // Asegúrate de que `servicios` sea un arreglo y agrega `fechaCreacion`
+    const clienteData = {
+      ...formData,
+      servicios: formData.servicios ? [formData.servicios] : [], // Convertir a arreglo
+      fechaCreacion: new Date().toISOString(), // Fecha actual en formato ISO
+    };
+
+    await onSave(clienteData);
+    setError('');
+  } catch (error) {
+    console.error('Error al guardar cliente:', error.message);
+    setError(error.message || 'Error al guardar el cliente.');
+  }
+};
+
 
   if (!isOpen) return null;
 

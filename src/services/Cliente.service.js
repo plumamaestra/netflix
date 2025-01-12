@@ -34,11 +34,18 @@ export const ClienteService = {
    */
   addClient: async (clientData) => {
     const clientesCol = collection(firestore, CLIENTES_COLLECTION);
-    const newClient = new Cliente(clientData);
-    newClient.validate();
-    const docRef = await addDoc(clientesCol, { ...newClient });
-    return { id: docRef.id, ...newClient };
+    
+    // Asegúrate de que `servicios` sea un arreglo y `fechaCreacion` esté definido
+    const normalizedClient = {
+      ...clientData,
+      servicios: Array.isArray(clientData.servicios) ? clientData.servicios : [],
+      fechaCreacion: clientData.fechaCreacion || new Date().toISOString(),
+    };
+  
+    const docRef = await addDoc(clientesCol, normalizedClient);
+    return { id: docRef.id, ...normalizedClient };
   },
+  
 
   /**
    * Actualizar cliente

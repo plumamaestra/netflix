@@ -11,7 +11,7 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
     servicioId: '',
     servicio: '',
     monto: '',
-    fechaPago: new Date().toISOString().split('T')[0],
+    fechaPago: '',
     estado: 'Pendiente',
     numeroMeses: 1,
   });
@@ -107,8 +107,8 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
    */
   const handleClienteChange = async (e) => {
     const clienteId = e.target.value;
+  
     if (!clienteId) {
-      // Si no hay cliente seleccionado, limpiamos la info
       setFormData({
         clienteId: '',
         clienteNombre: '',
@@ -116,17 +116,17 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
         servicioId: '',
         servicio: '',
         monto: '',
-        fechaPago: new Date().toISOString().split('T')[0],
+        fechaPago: '', // Limpiamos la fecha si no hay cliente
         estado: 'Pendiente',
         numeroMeses: 1,
       });
       setFilteredServices([]);
       return;
     }
-
+  
     try {
       const selectedCliente = await ClienteService.getClientById(clienteId);
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         clienteId: selectedCliente.id,
         clienteNombre: selectedCliente.name,
@@ -134,23 +134,23 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
         servicioId: '',
         servicio: '',
         monto: '',
+        fechaPago: selectedCliente.proximaFechaPago || '', // Usar proximaFechaPago del cliente
       }));
-
-      // Filtramos los servicios que el cliente tiene contratado
+  
+      // Filtrar los servicios que el cliente tiene contratado
       const servicioIds = Array.isArray(selectedCliente.servicios)
-        ? selectedCliente.servicios.map(ref => ref.id)
-        : selectedCliente.servicios && selectedCliente.servicios.id
-        ? [selectedCliente.servicios.id]
+        ? selectedCliente.servicios.map((ref) => (typeof ref === 'object' ? ref.id : ref))
         : [];
-
-      const clientServices = allServices.filter(s => servicioIds.includes(s.id));
+  
+      const clientServices = allServices.filter((s) => servicioIds.includes(s.id));
       setFilteredServices(clientServices);
-
-      // AUTO-SELECCIONAMOS si tiene solo un servicio
+  
+      // Seleccionar automáticamente el primer servicio si hay solo uno
       if (clientServices.length === 1) {
         const unicoServicio = clientServices[0];
         const total = unicoServicio.precioMensual * formData.numeroMeses;
-        setFormData(prev => ({
+  
+        setFormData((prev) => ({
           ...prev,
           servicioId: unicoServicio.id,
           servicio: unicoServicio.nombre,
@@ -162,6 +162,8 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
       setFormError('Error al obtener los datos del cliente seleccionado.');
     }
   };
+  
+  
 
   /**
    * Maneja el cambio de servicio

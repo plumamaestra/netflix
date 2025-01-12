@@ -3,14 +3,19 @@ import React, { useState, useEffect } from 'react';
 import { X, MessageCircle, Send } from 'lucide-react';
 
 // Función para formatear fechas
+// Función para formatear fechas
 const formatFecha = (fecha) => {
   if (!fecha) return 'Fecha No Definida';
-  const date = new Date(fecha);
-  const day = date.getDate();
-  const month = date.getMonth() + 1; // Los meses comienzan desde 0
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+
+  // Manejar fecha como cadena (ISO string)
+  if (typeof fecha === 'string') {
+    const date = new Date(fecha + 'T00:00:00'); // Asegurar que se maneje como fecha local
+    return date.toLocaleDateString(); // Mostrar en formato local
+  }
+
+  return 'Fecha No Definida';
 };
+
 
 // Función para reemplazar los placeholders
 const processTemplate = (template, clientData) => {

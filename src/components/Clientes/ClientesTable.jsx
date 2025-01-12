@@ -103,11 +103,10 @@ const ClientesTable = ({ clients, onEdit, onDelete, plantillas = [] }) => { // A
                   {/* Estado del Cliente */}
                   <td className="px-4 py-2">
                     <span
-                      className={`px-2 py-1 rounded-md ${
-                        client.estado === 'Activo'
+                      className={`px-2 py-1 rounded-md ${client.estado === 'Activo'
                           ? 'bg-green-200 text-green-700'
                           : 'bg-red-200 text-red-700'
-                      }`}
+                        }`}
                     >
                       {client.estado}
                     </span>
@@ -115,7 +114,7 @@ const ClientesTable = ({ clients, onEdit, onDelete, plantillas = [] }) => { // A
 
                   {/* Servicios del Cliente */}
                   <td className="px-4 py-2">
-                    {client.servicios && client.servicios.length > 0 ? (
+                    {Array.isArray(client.servicios) && client.servicios.length > 0 ? (
                       <div className="flex flex-wrap">
                         {client.servicios.map((servicio, index) => (
                           <span

@@ -1,8 +1,7 @@
-// src/components/Pagos/PagosTable.jsx
 import React, { useState, useEffect } from 'react';
 import { Edit, Trash2, MessageCircle } from 'lucide-react';
 import WhatsAppModal from '../WhatsApp/WhatsAppModal';
-import { getDoc } from 'firebase/firestore';
+import { getDoc, doc } from 'firebase/firestore';
 import { firestore } from '../../firebase/firebaseConfig';
 
 const PagosTable = ({ payments = [], plantillas = [], onEdit, onDelete }) => {
@@ -51,29 +50,44 @@ const PagosTable = ({ payments = [], plantillas = [], onEdit, onDelete }) => {
    */
   const formatFecha = (fecha) => {
     if (!fecha) return 'N/A';
-    if (fecha.toDate) {
-      return fecha.toDate().toLocaleDateString();
-    } else if (typeof fecha === 'string') {
-      return new Date(fecha).toLocaleDateString();
+  
+    // Manejar fecha como cadena (ISO string)
+    if (typeof fecha === 'string') {
+      const date = new Date(fecha + 'T00:00:00'); // Asegurar el formato de fecha local
+      return date.toLocaleDateString();
     }
+  
     return 'N/A';
   };
-
+  
   /**
    * Obtener el nombre del servicio basado en servicioId (Referencia)
    */
   const getServiceName = async (servicioRef) => {
     if (!servicioRef) return 'Sin servicio';
-    const servicioId = servicioRef.id;
+
+    let servicioId;
+    if (typeof servicioRef === 'string') {
+      // Caso en que servicioRef es una cadena (referencia como /servicios/{id})
+      const parts = servicioRef.split('/');
+      servicioId = parts[parts.length - 1];
+    } else if (servicioRef.id) {
+      // Caso en que servicioRef es una referencia Firestore
+      servicioId = servicioRef.id;
+    } else {
+      return 'Servicio desconocido';
+    }
+
     // Verificar si ya está en el cache
     if (serviceCache[servicioId]) {
       return serviceCache[servicioId];
     }
+
     try {
-      const servicioDoc = await getDoc(servicioRef);
+      const servicioDoc = await getDoc(doc(firestore, 'servicios', servicioId));
       if (servicioDoc.exists()) {
         const nombre = servicioDoc.data().nombre;
-        setServiceCache(prev => ({ ...prev, [servicioId]: nombre }));
+        setServiceCache((prev) => ({ ...prev, [servicioId]: nombre }));
         return nombre;
       } else {
         return 'Servicio no encontrado';
@@ -91,7 +105,9 @@ const PagosTable = ({ payments = [], plantillas = [], onEdit, onDelete }) => {
     const fetchServiceNames = async () => {
       const updatedPayments = await Promise.all(
         payments.map(async (payment) => {
-          const servicioNombre = await getServiceName(payment.servicioId);
+          const servicioNombre = payment.servicio
+            ? payment.servicio // Usar el nombre del servicio directamente si está disponible
+            : await getServiceName(payment.servicioId); // Obtenerlo desde la referencia
           return { ...payment, servicioNombre };
         })
       );
@@ -108,7 +124,7 @@ const PagosTable = ({ payments = [], plantillas = [], onEdit, onDelete }) => {
   /**
    * Filtrar plantillas para excluir aquellas con tipo === 'Nuevo Cliente'
    */
-  const filteredPlantillas = plantillas.filter(plantilla => plantilla.tipo !== 'Nuevo Cliente');
+  const filteredPlantillas = plantillas.filter((plantilla) => plantilla.tipo !== 'Nuevo Cliente');
 
   return (
     <>
