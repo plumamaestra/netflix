@@ -8,6 +8,7 @@ import Pagos from './pages/Pagos';
 import Reportes from './pages/Reportes';
 import Login from './pages/Login';
 import Plantillas from './pages/Plantillas';
+import Configuracion from './pages/Configuracion';
 
 function Router() {
   return (
@@ -23,6 +24,7 @@ function Router() {
         <Route path="pagos" element={<Pagos />} />
         <Route path="reportes" element={<Reportes />} />
         <Route path="plantillas" element={<Plantillas />} />
+        <Route path="settings" element={<Configuracion />} />
       </Route>
     </Routes>
   );
