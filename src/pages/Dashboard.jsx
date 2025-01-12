@@ -1,3 +1,4 @@
+// src/pages/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
 import {
   TrendingUp,
@@ -10,10 +11,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
-// Importa tus servicios:
-import { ClienteService } from '../services/Cliente.service';
-import { PagoService } from '../services/Pago.service';
-import { ServicioService } from '../services/Servicio.service';
+// Importa tu servicio DashboardService
+import { DashboardService } from '../services/Dashboard.service';
 
 // Card Reutilizable
 const Card = ({ children, className = '' }) => (
@@ -27,8 +26,6 @@ const Dashboard = () => {
   // 1. Estados para tu dashboard, mes y año separados
   // -------------------------------------------------
   const today = new Date();
-  // Por defecto, podemos iniciar en el mes y año actual,
-  // o en 2025, según prefieras:
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
 
@@ -44,13 +41,14 @@ const Dashboard = () => {
     pendingPayments: 0,
   });
   const [morosoClients, setMorosoClients] = useState([]);
+  const [loading, setLoading] = useState(true); // Estado de carga
+  const [error, setError] = useState(null); // Estado de error
 
   // ---------------------------------------
   // 2. Funciones para cambiar de mes / año
   // ---------------------------------------
   const handlePreviousMonth = () => {
     if (selectedMonth === 0) {
-      // Si estamos en enero y vamos al mes anterior, retrocedemos el año
       setSelectedMonth(11);
       setSelectedYear((prevYear) => prevYear - 1);
     } else {
@@ -60,7 +58,6 @@ const Dashboard = () => {
 
   const handleNextMonth = () => {
     if (selectedMonth === 11) {
-      // Si estamos en diciembre y pasamos al siguiente, avanzamos el año
       setSelectedMonth(0);
       setSelectedYear((prevYear) => prevYear + 1);
     } else {
@@ -72,76 +69,42 @@ const Dashboard = () => {
   // 3. useEffect para cargar y filtrar los datos
   // ---------------------------------------
   useEffect(() => {
-    // 1. Obtener todos los clientes, pagos y servicios
-    const allClients = ClienteService.getClients();
-    const allPayments = PagoService.getPayments();
-    const allServices = ServicioService.getServices();
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // Obtener estadísticas del Dashboard
+        const dashboardStats = await DashboardService.getDashboardStats(selectedMonth, selectedYear);
+        setStats({
+          ingresosTotales: dashboardStats.ingresosTotales,
+          distribucionServicios: dashboardStats.distribucionServicios,
+        });
+        setClientsStatus({
+          active: dashboardStats.clientesActivos,
+          inactive: dashboardStats.clientesInactivos,
+        });
+        setPaymentsSummary({
+          totalPayments: dashboardStats.totalPagos,
+          paidClients: dashboardStats.pagosRealizados,
+          pendingPayments: dashboardStats.pagosPendientes,
+        });
 
-    // 2. Filtrar los pagos que coincidan con selectedMonth y selectedYear
-    const monthlyPayments = allPayments.filter((payment) => {
-      const pagoDate = new Date(payment.fechaPago);
-      return (
-        pagoDate.getFullYear() === selectedYear &&
-        pagoDate.getMonth() === selectedMonth
-      );
-    });
+        // Obtener próximos pagos
+        const upcoming = await DashboardService.getUpcomingPayments(selectedMonth, selectedYear);
+        setUpcomingPayments(upcoming);
 
-    // 3. Dividirlos en pagos pagados y pendientes
-    const paidPayments = monthlyPayments.filter((p) => p.estado === 'Pagado');
-    const pendingPayments = monthlyPayments.filter((p) => p.estado === 'Pendiente');
-
-    // 4. Calcular ingresos totales (solo de este mes y año)
-    const ingresosTotales = paidPayments.reduce((acc, p) => acc + (p.monto || 0), 0);
-
-    // 5. Distribución de servicios (solo de los pagos pagados)
-    const distribucionServicios = {};
-    paidPayments.forEach((pago) => {
-      const servicio = pago.servicio || 'Desconocido';
-      if (!distribucionServicios[servicio]) {
-        distribucionServicios[servicio] = 0;
+        // Obtener clientes morosos
+        const morosos = await DashboardService.getMorosoClients();
+        setMorosoClients(morosos);
+      } catch (err) {
+        console.error('Error al cargar los datos del Dashboard:', err);
+        setError('Hubo un error al cargar los datos. Por favor, intenta de nuevo más tarde.');
+      } finally {
+        setLoading(false);
       }
-      distribucionServicios[servicio]++;
-    });
+    };
 
-    // 6. Seteamos stats
-    setStats({
-      ingresosTotales,
-      distribucionServicios,
-    });
-
-    // 7. Clientes Activos e Inactivos (por estado)
-    const activeClients = allClients.filter((c) => c.estado === 'Activo');
-    const inactiveClients = allClients.filter((c) => c.estado === 'Inactivo');
-
-    setClientsStatus({
-      active: activeClients.length,
-      inactive: inactiveClients.length,
-    });
-
-    // 8. Resumen de pagos (totales, pagados, pendientes)
-    setPaymentsSummary({
-      totalPayments: monthlyPayments.length,
-      paidClients: paidPayments.length,
-      pendingPayments: pendingPayments.length,
-    });
-
-    // 9. Próximos pagos: Tomamos los pendientes del mes/año, ordenados por fecha
-    const upcoming = pendingPayments
-      .sort((a, b) => new Date(a.fechaPago) - new Date(b.fechaPago))
-      .slice(0, 5);
-    setUpcomingPayments(upcoming);
-
-    // 10. Clientes “morosos” si tienen 2+ pagos pendientes (en todos los pagos, no solo en el mes)
-    const morosos = allClients.filter((cliente) => {
-      // Buscamos todos los pagos pendientes de este cliente
-      const pagosPendientesCliente = allPayments.filter(
-        (pago) => pago.clienteId === cliente.id && pago.estado === 'Pendiente'
-      );
-      // Retorna true si tiene 2 o más pagos pendientes
-      return pagosPendientesCliente.length >= 2;
-    });
-    setMorosoClients(morosos);
-
+    fetchData();
   }, [selectedMonth, selectedYear]);
 
   // ---------------
@@ -217,161 +180,169 @@ const Dashboard = () => {
         </div>
       </Card>
 
-      {/* Main Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl">
-              <TrendingUp className="text-white w-6 h-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-500 font-medium">Ingresos Totales</p>
-              <h2 className="text-2xl font-bold text-gray-800">
-                {formatMoney(stats.ingresosTotales || 0)}
-              </h2>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center">
-            <div className="bg-gradient-to-br from-green-500 to-green-600 p-3 rounded-xl">
-              <Users className="text-white w-6 h-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-500 font-medium">Clientes Activos</p>
-              <h2 className="text-2xl font-bold text-gray-800">
-                {clientsStatus.active}
-              </h2>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center">
-            <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 p-3 rounded-xl">
-              <Clock className="text-white w-6 h-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-500 font-medium">Pagos Pendientes</p>
-              <h2 className="text-2xl font-bold text-gray-800">
-                {paymentsSummary.pendingPayments}
-              </h2>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Payment Summary & Morosos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-6">Resumen de Pagos</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-green-50 p-4 rounded-xl">
+      {loading ? (
+        <p className="text-center text-gray-500">Cargando datos...</p>
+      ) : error ? (
+        <p className="text-center text-red-500">{error}</p>
+      ) : (
+        <>
+          {/* Main Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="p-6 hover:shadow-md transition-shadow">
               <div className="flex items-center">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <p className="ml-2 text-sm font-medium text-gray-600">
-                  Pagos Realizados
-                </p>
+                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl">
+                  <TrendingUp className="text-white w-6 h-6" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm text-gray-500 font-medium">Ingresos Totales</p>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    {formatMoney(stats.ingresosTotales || 0)}
+                  </h2>
+                </div>
               </div>
-              <h3 className="text-2xl font-bold text-gray-800 mt-2">
-                {paymentsSummary.paidClients}
-              </h3>
-            </div>
-            <div className="bg-red-50 p-4 rounded-xl">
+            </Card>
+
+            <Card className="p-6 hover:shadow-md transition-shadow">
               <div className="flex items-center">
-                <Clock className="w-5 h-5 text-red-600" />
-                <p className="ml-2 text-sm font-medium text-gray-600">
-                  Pagos Pendientes
+                <div className="bg-gradient-to-br from-green-500 to-green-600 p-3 rounded-xl">
+                  <Users className="text-white w-6 h-6" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm text-gray-500 font-medium">Clientes Activos</p>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    {clientsStatus.active}
+                  </h2>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6 hover:shadow-md transition-shadow">
+              <div className="flex items-center">
+                <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 p-3 rounded-xl">
+                  <Clock className="text-white w-6 h-6" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm text-gray-500 font-medium">Pagos Pendientes</p>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    {paymentsSummary.pendingPayments}
+                  </h2>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Payment Summary & Morosos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-6">Resumen de Pagos</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-green-50 p-4 rounded-xl">
+                  <div className="flex items-center">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <p className="ml-2 text-sm font-medium text-gray-600">
+                      Pagos Realizados
+                    </p>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-800 mt-2">
+                    {paymentsSummary.paidClients}
+                  </h3>
+                </div>
+                <div className="bg-red-50 p-4 rounded-xl">
+                  <div className="flex items-center">
+                    <Clock className="w-5 h-5 text-red-600" />
+                    <p className="ml-2 text-sm font-medium text-gray-600">
+                      Pagos Pendientes
+                    </p>
+                  </div>
+                  <h3 className="text-2xl font-bold text-red-600 mt-2">
+                    {paymentsSummary.pendingPayments}
+                  </h3>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-6">Clientes Morosos</h2>
+              <div className="space-y-4">
+                {morosoClients.length > 0 ? (
+                  morosoClients.map((client) => (
+                    <div
+                      key={client.id}
+                      className="flex justify-between items-center p-3 bg-red-50 rounded-lg"
+                    >
+                      <span className="font-medium text-gray-800">{client.name}</span>
+                      <span className="px-3 py-1 bg-red-100 text-red-600 rounded-full text-sm font-medium">
+                        Moroso
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-gray-500 py-4">
+                    No hay clientes morosos
+                  </p>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* Próximos Pagos */}
+          <Card className="p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-6">Próximos Pagos</h2>
+            <div className="grid gap-4">
+              {upcomingPayments.length > 0 ? (
+                upcomingPayments.map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="flex justify-between items-center p-4 bg-blue-50 rounded-lg"
+                  >
+                    <div className="flex items-center">
+                      <Calendar className="w-5 h-5 text-blue-600 mr-3" />
+                      <span className="font-medium text-gray-800">
+                        {payment.clienteNombre}
+                      </span>
+                    </div>
+                    <span className="text-sm text-blue-600 font-medium">
+                      {formatDate(payment.fechaPago)}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-gray-500 py-4">
+                  No hay pagos próximos
                 </p>
-              </div>
-              <h3 className="text-2xl font-bold text-red-600 mt-2">
-                {paymentsSummary.pendingPayments}
-              </h3>
+              )}
             </div>
-          </div>
-        </Card>
+          </Card>
 
-        <Card className="p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-6">Clientes Morosos</h2>
-          <div className="space-y-4">
-            {morosoClients.length > 0 ? (
-              morosoClients.map((client) => (
-                <div
-                  key={client.id}
-                  className="flex justify-between items-center p-3 bg-red-50 rounded-lg"
-                >
-                  <span className="font-medium text-gray-800">{client.name}</span>
-                  <span className="px-3 py-1 bg-red-100 text-red-600 rounded-full text-sm font-medium">
-                    Moroso
-                  </span>
+          {/* Distribución de Servicios */}
+          <Card className="p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-6">Distribución de Servicios</h2>
+            <div className="space-y-6">
+              {Object.entries(stats.distribucionServicios || {}).map(([servicio, count]) => (
+                <div key={servicio}>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="font-medium text-gray-700">{servicio}</span>
+                    <span className="text-blue-600 font-medium">
+                      {count} {count === 1 ? 'pago' : 'pagos'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2.5">
+                    <div
+                      className="h-2.5 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
+                      style={{
+                        width:
+                          paymentsSummary.paidClients > 0
+                            ? `${(count / paymentsSummary.paidClients) * 100}%`
+                            : '0%',
+                      }}
+                    />
+                  </div>
                 </div>
-              ))
-            ) : (
-              <p className="text-center text-gray-500 py-4">
-                No hay clientes morosos
-              </p>
-            )}
-          </div>
-        </Card>
-      </div>
-
-      {/* Próximos Pagos */}
-      <Card className="p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-6">Próximos Pagos</h2>
-        <div className="grid gap-4">
-          {upcomingPayments.length > 0 ? (
-            upcomingPayments.map((payment) => (
-              <div
-                key={payment.id}
-                className="flex justify-between items-center p-4 bg-blue-50 rounded-lg"
-              >
-                <div className="flex items-center">
-                  <Calendar className="w-5 h-5 text-blue-600 mr-3" />
-                  <span className="font-medium text-gray-800">
-                    {payment.clienteNombre}
-                  </span>
-                </div>
-                <span className="text-sm text-blue-600 font-medium">
-                  {formatDate(payment.fechaPago)}
-                </span>
-              </div>
-            ))
-          ) : (
-            <p className="text-center text-gray-500 py-4">
-              No hay pagos próximos
-            </p>
-          )}
-        </div>
-      </Card>
-
-      {/* Distribución de Servicios */}
-      <Card className="p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-6">Distribución de Servicios</h2>
-        <div className="space-y-6">
-          {Object.entries(stats.distribucionServicios || {}).map(([servicio, count]) => (
-            <div key={servicio}>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="font-medium text-gray-700">{servicio}</span>
-                <span className="text-blue-600 font-medium">
-                  {count} {count === 1 ? 'pago' : 'pagos'}
-                </span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2.5">
-                <div
-                  className="h-2.5 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
-                  style={{
-                    width:
-                      paymentsSummary.paidClients > 0
-                        ? `${(count / paymentsSummary.paidClients) * 100}%`
-                        : '0%',
-                  }}
-                />
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </Card>
+          </Card>
+        </>
+      )}
     </div>
   );
 };
