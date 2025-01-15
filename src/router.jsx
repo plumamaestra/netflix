@@ -25,6 +25,7 @@ function Router() {
         <Route path="reportes" element={<Reportes />} />
         <Route path="plantillas" element={<Plantillas />} />
         <Route path="settings" element={<Configuracion />} />
+        <Route path="login" element={<Login />} />
       </Route>
     </Routes>
   );

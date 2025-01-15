@@ -1,6 +1,8 @@
-// src/components/Clientes/AddClientModal.jsx
 import React, { useState, useEffect } from 'react';
+import { Form, Input, Button, message } from 'antd';
 import { ServicioService } from '../../services/Servicio.service';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../firebase/firebaseConfig';
 
 const AddClientModal = ({ isOpen, onClose, onSave, initialData }) => {
   const [formData, setFormData] = useState({
@@ -9,15 +11,14 @@ const AddClientModal = ({ isOpen, onClose, onSave, initialData }) => {
     estado: 'Activo',
     servicios: '',
     proximaFechaPago: '',
+    email: '', // Agregar el campo de email para el usuario
+    password: '', // Agregar el campo de password
   });
 
   const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(''); // Para advertencias
 
-  /**
-   * Cargar servicios disponibles y datos iniciales
-   */
   useEffect(() => {
     if (!isOpen) return;
 
@@ -45,21 +46,17 @@ const AddClientModal = ({ isOpen, onClose, onSave, initialData }) => {
         estado: 'Activo',
         servicios: '',
         proximaFechaPago: '',
+        email: '', // Limpiar email
+        password: '', // Limpiar password
       });
     }
   }, [initialData, isOpen]);
 
-  /**
-   * Manejar cambios en los inputs
-   */
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
 
-  /**
-   * Manejar selección del servicio
-   */
   const handleServiceChange = async (e) => {
     const selectedServiceId = e.target.value;
     setFormData({ ...formData, servicios: selectedServiceId });
@@ -99,30 +96,39 @@ const AddClientModal = ({ isOpen, onClose, onSave, initialData }) => {
     }
   };
 
-  /**
- * Guardar Cliente
- */
-const handleSubmit = async () => {
-  try {
-    if (!formData.proximaFechaPago) {
-      throw new Error('Debe seleccionar un servicio con una próxima fecha de pago válida.');
+  const handleSubmit = async () => {
+    try {
+      if (!formData.proximaFechaPago) {
+        throw new Error('Debe seleccionar un servicio con una próxima fecha de pago válida.');
+      }
+
+      // Primero creamos el usuario con el correo y la contraseña
+      const { email, password } = formData;
+
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Asegúrate de que `servicios` sea un arreglo y agrega `fechaCreacion`
+      const clienteData = {
+        ...formData,
+        servicios: formData.servicios ? [formData.servicios] : [], // Convertir a arreglo
+        fechaCreacion: new Date().toISOString(), // Fecha actual en formato ISO
+        userId: user.uid, // Guardamos el UID del usuario creado
+        rol: 'cliente', // Asignamos el rol como "cliente"
+      };
+
+      // Guardamos al cliente en Firestore
+      await onSave(clienteData);
+
+      // Agregar un mensaje de éxito
+      message.success('Cliente creado correctamente.');
+      onClose(); // Cerrar el modal
+      setError('');
+    } catch (error) {
+      console.error('Error al guardar cliente:', error.message);
+      setError(error.message || 'Error al guardar el cliente.');
     }
-
-    // Asegúrate de que `servicios` sea un arreglo y agrega `fechaCreacion`
-    const clienteData = {
-      ...formData,
-      servicios: formData.servicios ? [formData.servicios] : [], // Convertir a arreglo
-      fechaCreacion: new Date().toISOString(), // Fecha actual en formato ISO
-    };
-
-    await onSave(clienteData);
-    setError('');
-  } catch (error) {
-    console.error('Error al guardar cliente:', error.message);
-    setError(error.message || 'Error al guardar el cliente.');
-  }
-};
-
+  };
 
   if (!isOpen) return null;
 
@@ -133,7 +139,7 @@ const handleSubmit = async () => {
           {initialData ? 'Editar Cliente' : 'Agregar Cliente'}
         </h2>
 
-        {/* Campo Nombre */}
+        {/* Campos del formulario */}
         <input
           name="name"
           placeholder="Nombre"
@@ -142,7 +148,6 @@ const handleSubmit = async () => {
           className="w-full mb-2 p-2 border rounded"
         />
 
-        {/* Campo Teléfono */}
         <input
           name="phone"
           placeholder="Teléfono"
@@ -151,7 +156,24 @@ const handleSubmit = async () => {
           className="w-full mb-2 p-2 border rounded"
         />
 
-        {/* Estado */}
+        <input
+          name="email"
+          type="email"
+          placeholder="Correo electrónico"
+          value={formData.email}
+          onChange={handleChange}
+          className="w-full mb-2 p-2 border rounded"
+        />
+
+        <input
+          name="password"
+          type="password"
+          placeholder="Contraseña"
+          value={formData.password}
+          onChange={handleChange}
+          className="w-full mb-2 p-2 border rounded"
+        />
+
         <select
           name="estado"
           value={formData.estado}
@@ -162,7 +184,6 @@ const handleSubmit = async () => {
           <option value="Inactivo">Inactivo</option>
         </select>
 
-        {/* Servicio */}
         <label className="block mb-1 text-sm text-gray-600">Servicio</label>
         {loading ? (
           <p>Cargando servicios...</p>
@@ -182,7 +203,6 @@ const handleSubmit = async () => {
           </select>
         )}
 
-        {/* Próxima Fecha de Pago */}
         <input
           name="proximaFechaPago"
           type="date"
@@ -191,14 +211,12 @@ const handleSubmit = async () => {
           className="w-full mb-4 p-2 border rounded bg-gray-100 cursor-not-allowed"
         />
 
-        {/* Mensaje de Error */}
         {error && (
           <div className="text-red-500 text-sm mb-4">
             ⚠️ {error}
           </div>
         )}
 
-        {/* Botones de Acción */}
         <div className="flex justify-end space-x-2">
           <button onClick={onClose} className="bg-gray-300 px-4 py-2 rounded">
             Cancelar

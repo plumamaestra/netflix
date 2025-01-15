@@ -35,11 +35,12 @@ export const ClienteService = {
   addClient: async (clientData) => {
     const clientesCol = collection(firestore, CLIENTES_COLLECTION);
     
-    // Asegúrate de que `servicios` sea un arreglo y `fechaCreacion` esté definido
     const normalizedClient = {
       ...clientData,
       servicios: Array.isArray(clientData.servicios) ? clientData.servicios : [],
       fechaCreacion: clientData.fechaCreacion || new Date().toISOString(),
+      rol: clientData.rol || 'cliente', // Agregar el rol
+      userId: clientData.userId, // Asignar el ID del usuario de Firebase
     };
   
     const docRef = await addDoc(clientesCol, normalizedClient);

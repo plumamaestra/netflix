@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
-  BarChart2,
   Users,
   Package,
   CreditCard,
@@ -15,19 +14,36 @@ import {
   Bell,
   User,
 } from 'lucide-react';
+import { auth } from '../firebase/firebaseConfig'; // Asegúrate de tener Firebase Auth configurado
+import { onAuthStateChanged } from 'firebase/auth';
 
 const Layout = () => {
   const [isProductOpen, setIsProductOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [user, setUser] = useState(null);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isLoginPage = location.pathname === '/login';
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (!currentUser) {
+        navigate('/login'); // Redirigir a login si el usuario no está autenticado
+      } else {
+        setUser(currentUser);
+      }
+    });
+
+    return () => unsubscribe(); // Limpiar el listener
+  }, [navigate]);
 
   if (isLoginPage) {
     return <Outlet />;
   }
 
-  const menuItems = [
+  // Los íconos y rutas en el menú
+  const menuItemsAdmin = [
     { icon: <LayoutDashboard size={20} />, text: 'Dashboard', path: '/' },
     { icon: <Users size={20} />, text: 'Clientes', path: '/clientes' },
     { icon: <Package size={20} />, text: 'Servicios', path: '/servicios' },
@@ -35,8 +51,12 @@ const Layout = () => {
     { icon: <FileText size={20} />, text: 'Reportes', path: '/reportes' },
   ];
 
+  const menuItemsCliente = [
+    { icon: <CreditCard size={20} />, text: 'Pagos', path: '/pagos' },
+    { icon: <FileText size={20} />, text: 'Reportes', path: '/reportes' },
+  ];
+
   const generalItems = [
-    { icon: <FileText size={20} />, text: 'Plantillas', path: '/plantillas' },
     { icon: <Settings size={20} />, text: 'Configuración', path: '/settings' },
     { icon: <Shield size={20} />, text: 'Seguridad', path: '/security' },
   ];
@@ -54,6 +74,8 @@ const Layout = () => {
       {!isSidebarOpen ? null : <span>{item.text}</span>}
     </NavLink>
   );
+
+  const userRole = user?.email === 'admin@example.com' ? 'admin' : 'cliente'; // Asegura el rol de tu usuario, este es un ejemplo simple
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -87,7 +109,7 @@ const Layout = () => {
               <p className="px-4 text-xs text-gray-400 uppercase mb-2">Menu</p>
             )}
             <nav className="space-y-1">
-              {menuItems.map((item, index) => (
+              {(userRole === 'admin' ? menuItemsAdmin : menuItemsCliente).map((item, index) => (
                 <MenuLink key={index} item={item} />
               ))}
             </nav>
@@ -110,12 +132,14 @@ const Layout = () => {
         <div className="p-4 border-t border-green-800">
           <div className="flex items-center">
             <div className="w-8 h-8 rounded-full bg-lime-500 flex items-center justify-center mr-3">
-              <span className="text-green-950 text-sm">FP</span>
+              <span className="text-green-950 text-sm">
+                {user?.displayName ? user.displayName.charAt(0) : 'U'}
+              </span>
             </div>
             {isSidebarOpen && (
               <div>
-                <h3 className="text-sm font-medium">Fandaww Punx</h3>
-                <p className="text-xs text-gray-400">fandaww6@gmail.com</p>
+                <h3 className="text-sm font-medium">{user?.name || 'Usuario'}</h3>
+                <p className="text-xs text-gray-400">{user?.email}</p>
               </div>
             )}
           </div>
@@ -131,7 +155,8 @@ const Layout = () => {
         {/* Top Navigation */}
         <div className="bg-white border-b h-16 flex items-center px-6 sticky top-0 z-30 shadow-md">
           <h1 className="text-xl font-semibold text-gray-800">
-            {menuItems.find((item) => item.path === location.pathname)?.text || 'Dashboard'}
+            {menuItemsAdmin.find((item) => item.path === location.pathname)?.text ||
+              'Dashboard'}
           </h1>
           <div className="ml-auto flex items-center space-x-4">
             <button className="text-gray-500 hover:text-gray-700">
