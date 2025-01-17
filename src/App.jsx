@@ -12,8 +12,8 @@ function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // // Ejecutamos la lógica de generación de pagos pendientes
-        // await PagoService.generatePendingPayments();
+        // Ejecutamos la lógica de generación de pagos pendientes
+        await PagoService.generatePendingPayments();
       } catch (err) {
         console.error('Error al generar pagos pendientes:', err);
         setError('Ocurrió un error al inicializar la aplicación. Por favor, inténtalo de nuevo más tarde.');

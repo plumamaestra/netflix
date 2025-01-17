@@ -1,4 +1,3 @@
-// src/services/Pago.service.js
 import {
   collection,
   getDocs,
@@ -129,12 +128,10 @@ export const PagoService = {
    * Generar pagos pendientes
    */
   generatePendingPayments: async () => {
-    console.log("⏳ Iniciando generación de pagos pendientes...");
     const clientes = await ClienteService.getClients();
   
     for (const cliente of clientes) {
       if (!cliente.servicios || cliente.servicios.length === 0) {
-        console.warn(`⚠️ Cliente ${cliente.name} no tiene un servicio asignado.`);
         continue;
       }
   
@@ -146,9 +143,6 @@ export const PagoService = {
         const servicio = await ServicioService.getServiceById(servicioId);
   
         if (!servicio || !cliente.proximaFechaPago) {
-          console.warn(
-            `⚠️ Cliente ${cliente.name} o servicio ${servicioId} no tienen una próxima fecha de pago válida.`
-          );
           continue;
         }
   
@@ -161,10 +155,6 @@ export const PagoService = {
         );
   
         if (diasDiferencia <= 3 && diasDiferencia >= 0) {
-          console.log(
-            `📅 Generando pago para el cliente ${cliente.name} - Fecha de pago: ${proximaFechaPago.toISOString().split("T")[0]}`
-          );
-  
           const existingPayments = await PagoService.getPaymentsByClientId(cliente.id);
   
           // Verificar si ya existe un pago pendiente para esta fecha y servicio
@@ -176,7 +166,6 @@ export const PagoService = {
           );
   
           if (!yaExistePagoPendiente) {
-            console.log(`✅ Generando pago pendiente para ${cliente.name}`);
             await PagoService.addPayment({
               clienteId: cliente.id,
               clienteNombre: cliente.name,
@@ -188,21 +177,10 @@ export const PagoService = {
               estado: "Pendiente",
               numeroMeses: 1,
             });
-          } else {
-            console.log(
-              `ℹ️ Ya existe un pago pendiente para ${cliente.name} en la fecha ${proximaFechaPago.toISOString().split("T")[0]}.`
-            );
           }
-        } else {
-          console.log(
-            `⏳ Aún no es tiempo para generar el pago para ${cliente.name}. Fecha de pago: ${proximaFechaPago.toISOString().split("T")[0]}.`
-          );
         }
       }
     }
-  
-    console.log("✅ Finalizó la generación de pagos pendientes.");
   },
-  
   
 };

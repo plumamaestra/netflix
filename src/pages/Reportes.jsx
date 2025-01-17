@@ -8,8 +8,8 @@ import ReportTable from '../components/Reportes/ReportTable';
 const Reportes = () => {
   const [summary, setSummary] = useState({});
   const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true); // Estado de carga
-  const [error, setError] = useState(null); // Estado de error
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchReportData = async () => {
@@ -23,7 +23,6 @@ const Reportes = () => {
         setSummary(summaryData);
         setPayments(paymentsData);
       } catch (err) {
-        console.error('Error al cargar los reportes:', err);
         setError('Hubo un error al cargar los reportes. Por favor, intenta de nuevo más tarde.');
       } finally {
         setLoading(false);
@@ -39,8 +38,6 @@ const Reportes = () => {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <h1 className="text-2xl font-bold text-gray-800 mb-4">📊 Reportes</h1>
-
       {loading ? (
         <p className="text-center text-gray-500">Cargando reportes...</p>
       ) : error ? (

@@ -14,24 +14,42 @@ import {
   Bell,
   User,
 } from 'lucide-react';
-import { auth } from '../firebase/firebaseConfig'; // Asegúrate de tener Firebase Auth configurado
-import { onAuthStateChanged } from 'firebase/auth';
+import { auth, firestore } from '../firebase/firebaseConfig'; // Importa firestore desde el archivo de configuración
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { query, collection, where, getDocs } from 'firebase/firestore'; // Usamos query y where para buscar por userId
 
 const Layout = () => {
   const [isProductOpen, setIsProductOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null); // Para almacenar el rol del usuario
   const location = useLocation();
   const navigate = useNavigate();
 
   const isLoginPage = location.pathname === '/login';
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
         navigate('/login'); // Redirigir a login si el usuario no está autenticado
       } else {
         setUser(currentUser);
+
+        // Buscar el documento del usuario en Firestore usando el campo 'userId'
+        const q = query(
+          collection(firestore, 'clientes'),
+          where('userId', '==', currentUser.uid) // Buscar por el campo userId
+        );
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          querySnapshot.forEach((doc) => {
+            const userData = doc.data();
+            setRole(userData.rol); // Establecer el rol del usuario desde la base de datos
+          });
+        } else {
+          setRole('cliente'); // Si no se encuentra el rol, asignamos 'cliente' por defecto
+        }
       }
     });
 
@@ -75,7 +93,14 @@ const Layout = () => {
     </NavLink>
   );
 
-  const userRole = user?.email === 'admin@example.com' ? 'admin' : 'cliente'; // Asegura el rol de tu usuario, este es un ejemplo simple
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate('/login');
+    } catch (error) {
+      console.error("Error al cerrar sesión: ", error);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -109,7 +134,7 @@ const Layout = () => {
               <p className="px-4 text-xs text-gray-400 uppercase mb-2">Menu</p>
             )}
             <nav className="space-y-1">
-              {(userRole === 'admin' ? menuItemsAdmin : menuItemsCliente).map((item, index) => (
+              {(role === 'admin' ? menuItemsAdmin : menuItemsCliente).map((item, index) => (
                 <MenuLink key={index} item={item} />
               ))}
             </nav>
@@ -138,11 +163,18 @@ const Layout = () => {
             </div>
             {isSidebarOpen && (
               <div>
-                <h3 className="text-sm font-medium">{user?.name || 'Usuario'}</h3>
+                <h3 className="text-sm font-medium">{user?.displayName || 'Usuario'}</h3>
                 <p className="text-xs text-gray-400">{user?.email}</p>
+                <p className="text-xs text-gray-400">{role === 'admin' ? 'Administrador' : 'Cliente'}</p> {/* Muestra el rol */}
               </div>
             )}
           </div>
+          <button
+            onClick={handleLogout}
+            className="mt-4 w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md"
+          >
+            Cerrar sesión
+          </button>
         </div>
       </div>
 

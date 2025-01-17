@@ -27,7 +27,6 @@ const Pagos = () => {
         const fetchedPlantillas = await PlantillaService.getPlantillas();
         setPlantillas(fetchedPlantillas);
       } catch (err) {
-        console.error('Error al cargar pagos o plantillas:', err);
         setError('No se pudieron cargar los pagos o plantillas.');
       } finally {
         setLoading(false);
@@ -56,7 +55,6 @@ const Pagos = () => {
       setModalOpen(false);
       setEditingPayment(null);
     } catch (err) {
-      console.error('Error al guardar pago:', err);
       setError('No se pudo guardar el pago.');
     }
   };
@@ -73,7 +71,6 @@ const Pagos = () => {
       const updatedPayments = await PagoService.getPayments();
       setPayments(updatedPayments);
     } catch (err) {
-      console.error('Error al eliminar pago:', err);
       setError('No se pudo eliminar el pago.');
     }
   };
@@ -88,20 +85,6 @@ const Pagos = () => {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      {/* Encabezado */}
-      <div className="flex justify-between items-center border-b pb-4 mb-4">
-        <h1 className="text-2xl font-bold text-gray-800">💵 Pagos</h1>
-        <button
-          onClick={() => {
-            setEditingPayment(null);
-            setModalOpen(true);
-          }}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
-        >
-          + Registrar Pago
-        </button>
-      </div>
-
       {/* Mensaje de Error */}
       {error && (
         <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">

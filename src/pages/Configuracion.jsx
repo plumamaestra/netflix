@@ -18,7 +18,6 @@ const Configuracion = () => {
         const config = await ConfiguracionService.getSettings();
         setSettings(config);
       } catch (err) {
-        console.error('Error al cargar la configuración:', err);
         setError('Hubo un problema al cargar la configuración.');
       } finally {
         setLoading(false);
@@ -34,7 +33,6 @@ const Configuracion = () => {
       setSettings(updatedSettings);
       alert('Configuración actualizada con éxito.');
     } catch (err) {
-      console.error('Error al guardar la configuración:', err);
       alert('Error al guardar la configuración.');
     }
   };
@@ -49,7 +47,6 @@ const Configuracion = () => {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <h1 className="text-2xl font-bold text-gray-800 mb-4">⚙️ Configuración</h1>
       <GeneralSettings settings={settings} onSave={handleSave} />
       <PaymentSettings settings={settings} onSave={handleSave} />
       <NotificationSettings settings={settings} onSave={handleSave} />
