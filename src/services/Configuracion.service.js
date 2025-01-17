@@ -1,51 +1,30 @@
 // src/services/Configuracion.service.js
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { firestore } from "../firebase/firebaseConfig";
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { firestore } from '../firebase/firebaseConfig';
 
-const CONFIGURACION_DOC = "configuracion/settings";
+// Puedes cambiar la referencia si quieres más documentos o colecciones.
+// Aquí, asumimos que guardas toda la configuración global en:
+// Colección "configuracion" y Documento con id "configGlobal".
+const CONFIG_DOC_REF = doc(firestore, 'configuracion', 'configGlobal');
 
 export const ConfiguracionService = {
   /**
-   * Obtener configuración general
+   * Obtiene la configuración global del sistema desde Firestore
    */
   getSettings: async () => {
-    try {
-      const configDoc = doc(firestore, CONFIGURACION_DOC);
-      const snapshot = await getDoc(configDoc);
-      if (snapshot.exists()) {
-        return snapshot.data();
-      } else {
-        return {
-          general: {
-            nombreSistema: "Mi Sistema",
-            moneda: "USD",
-          },
-          pagos: {
-            impuesto: 0,
-            recargoRetraso: 0,
-          },
-          notificaciones: {
-            habilitarRecordatorios: true,
-            metodoEnvio: "WhatsApp",
-          },
-        };
-      }
-    } catch (error) {
-      console.error("Error al obtener configuración:", error);
-      throw error;
+    const snapshot = await getDoc(CONFIG_DOC_REF);
+    if (snapshot.exists()) {
+      return snapshot.data();
     }
+    // Si el documento no existe, podrías crearlo vacío o retornar algo por defecto
+    return {};
   },
 
   /**
-   * Actualizar configuración general
+   * Actualiza la configuración global del sistema en Firestore.
+   * setDoc con merge:true para fusionar la data con la existente.
    */
-  updateSettings: async (settings) => {
-    try {
-      const configDoc = doc(firestore, CONFIGURACION_DOC);
-      await setDoc(configDoc, settings);
-    } catch (error) {
-      console.error("Error al actualizar configuración:", error);
-      throw error;
-    }
+  updateSettings: async (updatedSettings) => {
+    await setDoc(CONFIG_DOC_REF, updatedSettings, { merge: true });
   },
 };

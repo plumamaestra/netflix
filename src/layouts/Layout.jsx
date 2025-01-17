@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// src/layout/Layout.jsx
+import React, { useContext, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -8,59 +9,44 @@ import {
   FileText,
   Settings,
   Shield,
-  ChevronDown,
   Menu as MenuIcon,
   X,
   Bell,
-  User,
+  User as UserIcon,
 } from 'lucide-react';
-import { auth, firestore } from '../firebase/firebaseConfig'; // Importa firestore desde el archivo de configuración
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { query, collection, where, getDocs } from 'firebase/firestore'; // Usamos query y where para buscar por userId
+
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebase/firebaseConfig';
+import { UserContext } from '../context/UserContext';
 
 const Layout = () => {
-  const [isProductOpen, setIsProductOpen] = useState(false);
+  const { user, role, loading } = useContext(UserContext);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null); // Para almacenar el rol del usuario
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isLoginPage = location.pathname === '/login';
-
+  // Redireccionar a /login si no hay usuario autenticado
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        navigate('/login'); // Redirigir a login si el usuario no está autenticado
-      } else {
-        setUser(currentUser);
+    if (!loading && !user) {
+      navigate('/login');
+    }
+  }, [loading, user, navigate]);
 
-        // Buscar el documento del usuario en Firestore usando el campo 'userId'
-        const q = query(
-          collection(firestore, 'clientes'),
-          where('userId', '==', currentUser.uid) // Buscar por el campo userId
-        );
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-          querySnapshot.forEach((doc) => {
-            const userData = doc.data();
-            setRole(userData.rol); // Establecer el rol del usuario desde la base de datos
-          });
-        } else {
-          setRole('cliente'); // Si no se encuentra el rol, asignamos 'cliente' por defecto
-        }
-      }
-    });
-
-    return () => unsubscribe(); // Limpiar el listener
-  }, [navigate]);
-
-  if (isLoginPage) {
-    return <Outlet />;
+  // Manejo de carga inicial
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-700 text-lg">Cargando...</p>
+      </div>
+    );
   }
 
-  // Los íconos y rutas en el menú
+  // Si terminó de cargar y no hay usuario, no renderizamos nada
+  if (!user) {
+    return null;
+  }
+
+  // Íconos y rutas en el menú
   const menuItemsAdmin = [
     { icon: <LayoutDashboard size={20} />, text: 'Dashboard', path: '/' },
     { icon: <Users size={20} />, text: 'Clientes', path: '/clientes' },
@@ -79,6 +65,7 @@ const Layout = () => {
     { icon: <Shield size={20} />, text: 'Seguridad', path: '/security' },
   ];
 
+  // Componente para renderizar cada link del menú
   const MenuLink = ({ item }) => (
     <NavLink
       to={item.path}
@@ -89,16 +76,17 @@ const Layout = () => {
       }
     >
       <span className="mr-3">{item.icon}</span>
-      {!isSidebarOpen ? null : <span>{item.text}</span>}
+      {isSidebarOpen && <span>{item.text}</span>}
     </NavLink>
   );
 
+  // Cerrar sesión
   const handleLogout = async () => {
     try {
       await signOut(auth);
       navigate('/login');
     } catch (error) {
-      console.error("Error al cerrar sesión: ", error);
+      console.error('Error al cerrar sesión:', error);
     }
   };
 
@@ -115,7 +103,9 @@ const Layout = () => {
           <div className="flex items-center">
             <span className="text-lime-500 text-2xl">*</span>
             {isSidebarOpen && (
-              <span className="ml-2 text-white text-xl font-semibold">RentaPlay</span>
+              <span className="ml-2 text-white text-xl font-semibold">
+                RentaPlay
+              </span>
             )}
           </div>
           <button
@@ -126,24 +116,27 @@ const Layout = () => {
           </button>
         </div>
 
-        {/* Menu Section */}
+        {/* Menú Principal */}
         <div className="flex-1 px-2 overflow-y-auto">
-          {/* Menú Principal */}
           <div className="mb-4">
             {isSidebarOpen && (
               <p className="px-4 text-xs text-gray-400 uppercase mb-2">Menu</p>
             )}
             <nav className="space-y-1">
-              {(role === 'admin' ? menuItemsAdmin : menuItemsCliente).map((item, index) => (
-                <MenuLink key={index} item={item} />
-              ))}
+              {(role === 'admin' ? menuItemsAdmin : menuItemsCliente).map(
+                (item, index) => (
+                  <MenuLink key={index} item={item} />
+                )
+              )}
             </nav>
           </div>
 
           {/* Menú General */}
           <div>
             {isSidebarOpen && (
-              <p className="px-4 text-xs text-gray-400 uppercase mb-2">General</p>
+              <p className="px-4 text-xs text-gray-400 uppercase mb-2">
+                General
+              </p>
             )}
             <nav className="space-y-1">
               {generalItems.map((item, index) => (
@@ -163,9 +156,13 @@ const Layout = () => {
             </div>
             {isSidebarOpen && (
               <div>
-                <h3 className="text-sm font-medium">{user?.displayName || 'Usuario'}</h3>
+                <h3 className="text-sm font-medium">
+                  {user?.displayName || 'Usuario'}
+                </h3>
                 <p className="text-xs text-gray-400">{user?.email}</p>
-                <p className="text-xs text-gray-400">{role === 'admin' ? 'Administrador' : 'Cliente'}</p> {/* Muestra el rol */}
+                <p className="text-xs text-gray-400">
+                  {role === 'admin' ? 'Administrador' : 'Cliente'}
+                </p>
               </div>
             )}
           </div>
@@ -178,7 +175,7 @@ const Layout = () => {
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Contenido principal */}
       <div
         className={`flex-1 transition-all duration-300 ${
           isSidebarOpen ? 'ml-64' : 'ml-20'
@@ -187,6 +184,7 @@ const Layout = () => {
         {/* Top Navigation */}
         <div className="bg-white border-b h-16 flex items-center px-6 sticky top-0 z-30 shadow-md">
           <h1 className="text-xl font-semibold text-gray-800">
+            {/* Título dinámico basado en la ruta actual (opcional) */}
             {menuItemsAdmin.find((item) => item.path === location.pathname)?.text ||
               'Dashboard'}
           </h1>
@@ -195,12 +193,12 @@ const Layout = () => {
               <Bell size={20} />
             </button>
             <button className="text-gray-500 hover:text-gray-700">
-              <User size={20} />
+              <UserIcon size={20} />
             </button>
           </div>
         </div>
 
-        {/* Page Content */}
+        {/* Contenido de las páginas hijas */}
         <div className="p-6">
           <Outlet />
         </div>
