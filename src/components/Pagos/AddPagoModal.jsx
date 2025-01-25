@@ -28,10 +28,11 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
 
   useEffect(() => {
     if (!isOpen) return;
-
+  
     const fetchData = async () => {
       setLoadingClientes(true);
       setLoadingServicios(true);
+  
       try {
         const [clientesData, serviciosData] = await Promise.all([
           ClienteService.getClients(),
@@ -39,69 +40,66 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
         ]);
         setClientes(clientesData);
         setAllServices(serviciosData);
-
+  
         if (initialData) {
-          // Verificar si servicioId es una referencia y extraer el ID
+          // Normalizar servicioId
           const servicioId =
-            initialData.servicioId && initialData.servicioId.id
-              ? initialData.servicioId.id
+            typeof initialData.servicioId === "string"
+              ? initialData.servicioId.replace("/servicios/", "") // Extraer ID real si es una referencia
               : initialData.servicioId;
-
+  
+          // Establecer datos iniciales en el formulario
           setFormData({
             clienteId: initialData.clienteId,
             clienteNombre: initialData.clienteNombre,
             phone: initialData.phone,
-            servicioId: servicioId || '',
-            servicio: initialData.servicio || '',
-            monto: initialData.monto || '',
-            fechaPago: initialData.fechaPago || new Date().toISOString().split('T')[0],
-            estado: initialData.estado || 'Pendiente',
+            servicioId: servicioId || "",
+            servicio: initialData.servicio || "",
+            monto: initialData.monto || "",
+            fechaPago: initialData.fechaPago || new Date().toISOString().split("T")[0],
+            estado: initialData.estado || "Pendiente",
             numeroMeses: initialData.numeroMeses || 1,
           });
-
-          // Filtrar servicios según el cliente si se está editando
-          const selectedCliente = clientesData.find(c => c.id === initialData.clienteId);
+  
+          // Filtrar servicios según el cliente
+          const selectedCliente = clientesData.find((c) => c.id === initialData.clienteId);
           if (selectedCliente) {
-            // Extraer IDs de los servicios referenciados
             const servicioIds = Array.isArray(selectedCliente.servicios)
-              ? selectedCliente.servicios.map(ref => ref.id)
-              : selectedCliente.servicios && selectedCliente.servicios.id
-              ? [selectedCliente.servicios.id]
+              ? selectedCliente.servicios.map((ref) => (typeof ref === "string" ? ref : ref.id))
               : [];
-
-            const clientServices = serviciosData.filter(s => servicioIds.includes(s.id));
+            const clientServices = serviciosData.filter((s) => servicioIds.includes(s.id));
             setFilteredServices(clientServices);
           }
         } else {
+          // Si no hay datos iniciales, limpiar el formulario
           setFormData({
-            clienteId: '',
-            clienteNombre: '',
-            phone: '',
-            servicioId: '',
-            servicio: '',
-            monto: '',
-            fechaPago: new Date().toISOString().split('T')[0],
-            estado: 'Pendiente',
+            clienteId: "",
+            clienteNombre: "",
+            phone: "",
+            servicioId: "",
+            servicio: "",
+            monto: "",
+            fechaPago: new Date().toISOString().split("T")[0],
+            estado: "Pendiente",
             numeroMeses: 1,
           });
           setFilteredServices([]);
         }
-
-        // Resetear errores al abrir el modal
-        setFormError('');
+  
+        setFormError("");
       } catch (err) {
-        console.error('Error al cargar clientes o servicios:', err);
-        if (!clientes.length) setErrorClientes('No se pudieron cargar los clientes.');
-        if (!allServices.length) setErrorServicios('No se pudieron cargar los servicios.');
+        console.error("Error al cargar clientes o servicios:", err);
+        if (!clientes.length) setErrorClientes("No se pudieron cargar los clientes.");
+        if (!allServices.length) setErrorServicios("No se pudieron cargar los servicios.");
       } finally {
         setLoadingClientes(false);
         setLoadingServicios(false);
       }
     };
-
+  
     fetchData();
-  }, [initialData, isOpen]); // Eliminado 'clientes' y 'allServices' de las dependencias
-
+  }, [initialData, isOpen]);
+  
   /**
    * Maneja el cambio de cliente en el select
    */
@@ -249,16 +247,33 @@ const AddPagoModal = ({ isOpen, onClose, onSave, initialData }) => {
       setFormError('Por favor, complete todos los campos obligatorios.');
       return;
     }
-
+  
     try {
-      await onSave(formData);
-      onClose();
-      setFormError('');
+      // Calcular la próxima fecha de pago
+      const selectedCliente = clientes.find(cliente => cliente.id === formData.clienteId);
+      if (selectedCliente && selectedCliente.proximaFechaPago) {
+        const nextPaymentDate = new Date(selectedCliente.proximaFechaPago);
+        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1); // Avanzamos un mes
+  
+        // Ajustar el día al último del mes si es necesario
+        const lastDayOfNextMonth = new Date(nextPaymentDate.getFullYear(), nextPaymentDate.getMonth() + 1, 0);
+        nextPaymentDate.setDate(lastDayOfNextMonth.getDate()); // Seteamos el día al último día del mes siguiente
+  
+        // Asignamos la nueva fecha de pago calculada
+        const updatedPayment = {
+          ...formData,
+          proximaFechaPago: nextPaymentDate.toISOString().split('T')[0], // Guardamos la fecha en formato YYYY-MM-DD
+        };
+  
+        await onSave(updatedPayment);
+        onClose();
+        setFormError('');
+      }
     } catch (err) {
       console.error('Error al guardar pago:', err);
       setFormError('Error al guardar el pago.');
     }
-  };
+  };  
 
   if (!isOpen) return null;
 

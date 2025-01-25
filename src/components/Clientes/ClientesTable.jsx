@@ -1,11 +1,11 @@
-// src/components/Clientes/ClientesTable.jsx
 import React, { useEffect, useState } from 'react';
+import { format, parseISO } from 'date-fns'; // Importar funciones de date-fns
 import { ServicioService } from '../../services/Servicio.service';
 import WhatsAppModal from '../WhatsApp/WhatsAppModal';
 import { MessageCircle } from 'lucide-react';
 import { DocumentReference } from 'firebase/firestore'; // Importa DocumentReference si usas TypeScript
 
-const ClientesTable = ({ clients, onEdit, onDelete, plantillas = [] }) => { // Asignar valor por defecto
+const ClientesTable = ({ clients, onEdit, onDelete, plantillas = [] }) => { 
   const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -50,6 +50,21 @@ const ClientesTable = ({ clients, onEdit, onDelete, plantillas = [] }) => { // A
 
     const servicioEncontrado = serviciosDisponibles.find((s) => s.id === servicioId);
     return servicioEncontrado ? servicioEncontrado.nombre : 'Servicio desconocido';
+  };
+
+  /**
+   * Formatear la fecha en formato Día/Mes/Año con el mes en letras
+   */
+  const formatDate = (date) => {
+    const months = [
+      'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 
+      'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
+    ];
+    const d = parseISO(date); // Asegurarse de que la fecha se parse correctamente
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   /**
@@ -131,7 +146,7 @@ const ClientesTable = ({ clients, onEdit, onDelete, plantillas = [] }) => { // A
                   </td>
 
                   {/* Próxima Fecha de Pago */}
-                  <td className="px-4 py-2">{client.proximaFechaPago || 'N/A'}</td>
+                  <td className="px-4 py-2">{client.proximaFechaPago ? formatDate(client.proximaFechaPago) : 'N/A'}</td>
 
                   {/* Acciones */}
                   <td className="px-4 py-2 flex items-center space-x-2">
