@@ -126,98 +126,44 @@ export const PagoService = {
 
   /**
    * Generar pagos pendientes
-   */
+   */ 
   generatePendingPayments: async () => {
     const clientes = await ClienteService.getClients();
-    
+
     for (const cliente of clientes) {
       if (!cliente.servicios || cliente.servicios.length === 0) {
-          continue;
+        continue;
       }
 
       for (const servicioRef of cliente.servicios) {
-          const servicioId = typeof servicioRef === "string" ? servicioRef : servicioRef.id;
-          const servicio = await ServicioService.getServiceById(servicioId);
-
-          if (!servicio || !cliente.proximaFechaPago) {
-              continue;
-          }
-
-          const proximaFechaPago = new Date(cliente.proximaFechaPago);
-          const hoy = new Date();
-          const primerDiaDelMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-
-          // Verificar si la próxima fecha de pago es en el mes y año actual
-          if (proximaFechaPago.getMonth() === hoy.getMonth() && proximaFechaPago.getFullYear() === hoy.getFullYear()) {
-              const existingPayments = await PagoService.getPaymentsByClientId(cliente.id);
-
-              // Verificar si ya existe un pago pendiente para este cliente y servicio en el mes actual
-              const yaExistePagoPendiente = existingPayments.some(
-                  (pago) => {
-                      const fechaPago = new Date(pago.fechaPago);
-                      return (
-                          pago.servicioId.id === servicioId &&  // Comparar servicioId (puede ser referencia)
-                          fechaPago.getMonth() === proximaFechaPago.getMonth() &&  // Comparar mes
-                          fechaPago.getFullYear() === proximaFechaPago.getFullYear()  // Comparar año
-                      );
-                  }
-              );
-
-              // Si no existe pago pendiente para este mes, generar uno
-              if (!yaExistePagoPendiente) {
-                  await PagoService.addPayment({
-                      clienteId: cliente.id,
-                      clienteNombre: cliente.name,
-                      phone: cliente.phone,
-                      servicioId: servicioId,
-                      servicio: servicio.nombre,
-                      monto: parseFloat(servicio.precioMensual),
-                      fechaPago: proximaFechaPago.toISOString().split("T")[0], // Asignar directamente la próxima fecha de pago
-                      estado: "Pendiente",
-                      numeroMeses: 1,
-                  });
-              }
-          }
-      }
-  }
-  },
-
-};
-      );
-  
-      for (const servicioId of servicioIds) {
+        const servicioId =
+          typeof servicioRef === "string" ? servicioRef : servicioRef.id;
         const servicio = await ServicioService.getServiceById(servicioId);
-  
+
         if (!servicio || !cliente.proximaFechaPago) {
           continue;
         }
-  
+
         const proximaFechaPago = new Date(cliente.proximaFechaPago);
         const hoy = new Date();
-  
-        // Calcular la diferencia en días entre hoy y la próxima fecha de pago
-        const diasDiferencia = Math.floor(
-          (proximaFechaPago - hoy) / (1000 * 60 * 60 * 24)
-        );
-  
-        if (diasDiferencia <= 15 && diasDiferencia >= 0) { 
-          const existingPayments = await PagoService.getPaymentsByClientId(cliente.id);
-  
-          // Verificar si ya existe un pago pendiente para esta fecha y servicio en el mes actual
-          const yaExistePagoPendiente = existingPayments.some(
-            (pago) => {
-              const fechaPago = new Date(pago.fechaPago);
-              // Comparar el servicioId y verificar si la factura ya fue generada para el mismo mes y año
-              return (
-                pago.servicioId.id === servicioId &&  // Comparar servicioId (puede ser referencia)
-                fechaPago.getMonth() === proximaFechaPago.getMonth() &&  // Comparar mes
-                fechaPago.getFullYear() === proximaFechaPago.getFullYear() && // Comparar año
-                pago.estado === "Pendiente"
-              );
-            }
+
+        if (
+          proximaFechaPago.getMonth() === hoy.getMonth() &&
+          proximaFechaPago.getFullYear() === hoy.getFullYear()
+        ) {
+          const existingPayments = await PagoService.getPaymentsByClientId(
+            cliente.id
           );
-  
-          // Si no existe pago pendiente, generar uno
+
+          const yaExistePagoPendiente = existingPayments.some((pago) => {
+            const fechaPago = new Date(pago.fechaPago);
+            return (
+              pago.servicioId.id === servicioId &&
+              fechaPago.getMonth() === proximaFechaPago.getMonth() &&
+              fechaPago.getFullYear() === proximaFechaPago.getFullYear()
+            );
+          });
+
           if (!yaExistePagoPendiente) {
             await PagoService.addPayment({
               clienteId: cliente.id,
@@ -226,7 +172,7 @@ export const PagoService = {
               servicioId: servicioId,
               servicio: servicio.nombre,
               monto: parseFloat(servicio.precioMensual),
-              fechaPago: proximaFechaPago.toISOString().split("T")[0], // Asignar directamente la próxima fecha de pago
+              fechaPago: proximaFechaPago.toISOString().split("T")[0],
               estado: "Pendiente",
               numeroMeses: 1,
             });
@@ -234,6 +180,5 @@ export const PagoService = {
         }
       }
     }
-  },  
-  
+  },
 };
